@@ -29,6 +29,23 @@
       lensDark: new THREE.MeshStandardMaterial({ color: 0x0b1018, metalness: 1, roughness: 0.1 }),
       rubber: new THREE.MeshStandardMaterial({ color: 0x121212, roughness: 0.95 }),
     };
+    // Rolle jedes Materials – Skins ersetzen Materialien anhand dieser Rolle (siehe skins.js)
+    const ROLES = {
+      steel: 'metal',
+      steelDark: 'metalDark',
+      steelBright: 'metalBright',
+      walnut: 'wood',
+      beech: 'wood',
+      walnutDark: 'woodDark',
+      polymer: 'poly',
+      polymerDark: 'polyDark',
+      polymerDS: 'polyDS',
+      magazine: 'mag',
+      rubber: 'rubber',
+    };
+    Object.keys(ROLES).forEach((k) => {
+      M[k].userData.role = ROLES[k];
+    });
     return M;
   }
 

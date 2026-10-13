@@ -241,6 +241,202 @@
       return toTexture(c);
     },
 
+    // ---------- Muster für Waffen-Skins ----------
+
+    // Tarnmuster aus unregelmäßigen Flecken (nahtlos)
+    camo(colors, seed, opts) {
+      const o = opts || {};
+      const S = 256;
+      const c = makeCanvas(S, S);
+      const g = c.getContext('2d');
+      const r = rng(seed || 1);
+      g.fillStyle = colors[0];
+      g.fillRect(0, 0, S, S);
+      const count = o.count || 60;
+      for (let i = 0; i < count; i++) {
+        const col = colors[1 + Math.floor(r() * (colors.length - 1))];
+        const x = r() * S;
+        const y = r() * S;
+        const rad = (o.minR || 8) + r() * ((o.maxR || 28) - (o.minR || 8));
+        const pts = [];
+        const n = 7 + Math.floor(r() * 5);
+        for (let k = 0; k < n; k++) {
+          const a = (k / n) * Math.PI * 2;
+          const rr = rad * (0.55 + r() * 0.6);
+          pts.push([Math.cos(a) * rr * (o.stretch || 1), Math.sin(a) * rr]);
+        }
+        g.fillStyle = col;
+        for (let dx = -S; dx <= S; dx += S) {
+          for (let dy = -S; dy <= S; dy += S) {
+            g.beginPath();
+            pts.forEach((p, k) => (k ? g.lineTo(x + dx + p[0], y + dy + p[1]) : g.moveTo(x + dx + p[0], y + dy + p[1])));
+            g.closePath();
+            g.fill();
+          }
+        }
+      }
+      return toTexture(c, [1, 1]);
+    },
+
+    // Bundeswehr-Flecktarn: viele kleine Tupfen in fünf Farben
+    flecktarn() {
+      return SR.tex.camo(['#7d7a52', '#4d5a32', '#2f3b23', '#5b4632', '#181a14'], 77, { count: 420, minR: 3, maxR: 9 });
+    },
+
+    // Pixel-Tarnmuster
+    digital(colors, seed, cell) {
+      const S = 256;
+      const C = cell || 8;
+      const c = makeCanvas(S, S);
+      const g = c.getContext('2d');
+      const r = rng(seed || 2);
+      g.fillStyle = colors[0];
+      g.fillRect(0, 0, S, S);
+      for (let i = 0; i < 260; i++) {
+        g.fillStyle = colors[1 + Math.floor(r() * (colors.length - 1))];
+        const x = Math.floor((r() * S) / C) * C;
+        const y = Math.floor((r() * S) / C) * C;
+        const w = (1 + Math.floor(r() * 4)) * C;
+        const h = (1 + Math.floor(r() * 3)) * C;
+        g.fillRect(x, y, w, h);
+        if (x + w > S) g.fillRect(x - S, y, w, h);
+        if (y + h > S) g.fillRect(x, y - S, w, h);
+      }
+      return toTexture(c, [1, 1]);
+    },
+
+    // Holzfällerhemd-Karo
+    plaid(colors) {
+      const S = 128;
+      const c = makeCanvas(S, S);
+      const g = c.getContext('2d');
+      g.fillStyle = colors[0];
+      g.fillRect(0, 0, S, S);
+      g.fillStyle = colors[1];
+      g.globalAlpha = 0.85;
+      g.fillRect(0, 0, S / 2, S);
+      g.fillRect(0, 0, S, S / 2);
+      g.globalAlpha = 1;
+      g.fillStyle = colors[1];
+      g.fillRect(0, 0, S / 2, S / 2);
+      g.strokeStyle = colors[2];
+      g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(S * 0.75, 0);
+      g.lineTo(S * 0.75, S);
+      g.moveTo(0, S * 0.75);
+      g.lineTo(S, S * 0.75);
+      g.stroke();
+      return toTexture(c, [1, 1]);
+    },
+
+    // Damaszener Stahl: gewellte Lagen
+    damascus(c1, c2, seed) {
+      const S = 256;
+      const c = makeCanvas(S, S);
+      const g = c.getContext('2d');
+      const img = g.createImageData(S, S);
+      const r = rng(seed || 5);
+      const p = [r() * 6, r() * 6, r() * 6];
+      // Hex direkt lesen (THREE.Color würde in lineare Farbwerte umrechnen)
+      const hex = (h) => ({ r: parseInt(h.slice(1, 3), 16) / 255, g: parseInt(h.slice(3, 5), 16) / 255, b: parseInt(h.slice(5, 7), 16) / 255 });
+      const a = hex(c1);
+      const b = hex(c2);
+      for (let y = 0; y < S; y++) {
+        for (let x = 0; x < S; x++) {
+          const u = (x / S) * Math.PI * 2;
+          const yy = y + Math.sin(u + p[0]) * 18 + Math.sin(u * 3 + p[1]) * 7 + Math.sin(u * 5 + p[2]) * 3;
+          const k = Math.pow(Math.sin(yy * 0.29) * 0.5 + 0.5, 1.6);
+          const i = (y * S + x) * 4;
+          img.data[i] = (a.r + (b.r - a.r) * k) * 255;
+          img.data[i + 1] = (a.g + (b.g - a.g) * k) * 255;
+          img.data[i + 2] = (a.b + (b.b - a.b) * k) * 255;
+          img.data[i + 3] = 255;
+        }
+      }
+      g.putImageData(img, 0, 0);
+      return toTexture(c, [1, 1]);
+    },
+
+    // Gravur: Ranken auf Silber
+    engraving(base, line, seed) {
+      const S = 256;
+      const c = makeCanvas(S, S);
+      const g = c.getContext('2d');
+      const r = rng(seed || 7);
+      g.fillStyle = base;
+      g.fillRect(0, 0, S, S);
+      g.strokeStyle = line;
+      g.lineCap = 'round';
+      for (let i = 0; i < 26; i++) {
+        let x = r() * S;
+        let y = r() * S;
+        let a = r() * Math.PI * 2;
+        const turn = (r() < 0.5 ? -1 : 1) * (0.08 + r() * 0.1);
+        g.lineWidth = 1 + r() * 1.5;
+        g.beginPath();
+        g.moveTo(x, y);
+        for (let k = 0; k < 40; k++) {
+          a += turn * (1 + k * 0.03);
+          x += Math.cos(a) * 2.2;
+          y += Math.sin(a) * 2.2;
+          g.lineTo(x, y);
+        }
+        g.stroke();
+      }
+      return toTexture(c, [1, 1]);
+    },
+
+    // Lava: dunkles Gestein mit glühenden Rissen. which = 'map' oder 'glow'
+    lava(which, seed) {
+      const S = 256;
+      const c = makeCanvas(S, S);
+      const g = c.getContext('2d');
+      const r = rng(seed || 13);
+      const glow = which === 'glow';
+      g.fillStyle = glow ? '#000' : '#1b1512';
+      g.fillRect(0, 0, S, S);
+      if (!glow) softPatches(g, S, rng(99), 40, ['rgba(60,40,32,0.5)', 'rgba(10,8,8,0.5)'], 10, 40);
+      for (let i = 0; i < 18; i++) {
+        let x = r() * S;
+        let y = r() * S;
+        let a = r() * Math.PI * 2;
+        const w = 1.5 + r() * 2.5;
+        for (let k = 0; k < 30; k++) {
+          const nx = x + Math.cos(a) * 6;
+          const ny = y + Math.sin(a) * 6;
+          g.strokeStyle = glow ? '#ff7a1a' : '#a8320c';
+          g.lineWidth = w * (1 - k / 40);
+          g.beginPath();
+          g.moveTo(x, y);
+          g.lineTo(nx, ny);
+          g.stroke();
+          x = nx;
+          y = ny;
+          a += (r() - 0.5) * 1.1;
+        }
+      }
+      return toTexture(c, [1, 1]);
+    },
+
+    // Leuchtstreifen (für Neon-Skins als Leucht-Textur)
+    neonLines(color) {
+      const S = 128;
+      const c = makeCanvas(S, S);
+      const g = c.getContext('2d');
+      g.fillStyle = '#000';
+      g.fillRect(0, 0, S, S);
+      g.strokeStyle = color;
+      g.lineWidth = 3;
+      for (let i = -S; i < S * 2; i += 32) {
+        g.beginPath();
+        g.moveTo(i, 0);
+        g.lineTo(i + S, S);
+        g.stroke();
+      }
+      return toTexture(c, [1, 1]);
+    },
+
     soft() {
       const S = 64;
       const c = makeCanvas(S, S);

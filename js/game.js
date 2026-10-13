@@ -46,6 +46,10 @@
     bannerText: $('bannerText'),
     bannerSub: $('bannerSub'),
     toast: $('toast'),
+    money: $('money'),
+    dmgTotal: $('damageTotal'),
+    earn: $('earn'),
+    wSkin: $('wSkin'),
   };
 
   // ---------- Renderer & Szenen ----------
@@ -136,6 +140,10 @@
     return { def, index: i, table: t, view: v, hitbox, outline, flash, onTable: true, kick: 0, boltT: 1, ejected: true, shots: 0 };
   });
 
+  // ---------- Skin-Automat auf dem Platz ----------
+  const slotMachine = SR.buildSlotMachine(scene, -2.75, 3.05, 0, 0.6, world.padTop);
+  slotMachine.parts.forEach((m) => shootables.push(m));
+
   // ---------- Zustand ----------
   const state = {
     started: false,
@@ -167,6 +175,9 @@
     mouseX: 0.5,
     keys: {},
     sens: 1,
+    inSlot: false,
+    lookSlot: false,
+    slotHint: false,
   };
   const stats = { shots: 0, hits: 0, heads: 0, down: 0 };
   let round = { start: null, done: false, resetAt: 0 };
@@ -186,7 +197,139 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const smooth = (t) => t * t * (3 - 2 * t);
   const approach = (v, target, step) => (v < target ? Math.min(target, v + step) : Math.max(target, v - step));
-  const isActive = () => state.started && !state.paused;
+  const isActive = () => state.started && !state.paused && !state.inSlot;
+
+  // ---------- Geld (Taler) und Skins ----------
+  // Schaden = Taler: 10 pro Körpertreffer, 60 für den Kopf, 20 Bonus fürs Umwerfen,
+  // alles mal Weitschuss-Bonus (1 + Entfernung / 50 m).
+  const DMG = { body: 10, head: 60, down: 20 };
+  const econ = { money: 200, damage: 0, owned: {}, equipped: {}, usedSlot: false };
+  try {
+    const saved = JSON.parse(localStorage.getItem('sr-econ') || 'null');
+    if (saved && typeof saved.money === 'number') Object.assign(econ, saved);
+  } catch (e) {
+    /* kein Speicher – neues Spiel */
+  }
+  let econDirty = false;
+  let econSaveT = 0;
+  function saveEcon() {
+    econDirty = false;
+    try {
+      localStorage.setItem('sr-econ', JSON.stringify(econ));
+    } catch (e) {
+      /* egal */
+    }
+  }
+  window.addEventListener('pagehide', saveEcon);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) saveEcon();
+  });
+  function earn(n) {
+    econ.money += n;
+    econDirty = true;
+  }
+  function spend(n) {
+    if (econ.money < n) return false;
+    econ.money -= n;
+    saveEcon();
+    return true;
+  }
+  const owns = (wid, sid) => !!(econ.owned[wid] && econ.owned[wid][sid]);
+  function unlock(wid, sid) {
+    (econ.owned[wid] = econ.owned[wid] || {})[sid] = true;
+    saveEcon();
+  }
+  function applyWeaponSkin(w) {
+    const sid = econ.equipped[w.def.id] || 'standard';
+    SR.applySkin(w.table.group, w.def.id, sid);
+    SR.applySkin(w.view.group, w.def.id, sid);
+  }
+  function equipSkin(wid, sid) {
+    if (sid !== 'standard' && !owns(wid, sid)) return;
+    econ.equipped[wid] = sid;
+    saveEcon();
+    const w = weapons.find((x) => x.def.id === wid);
+    if (w) applyWeaponSkin(w);
+    if (w && state.held === w) updateWeaponCard();
+  }
+  weapons.forEach(applyWeaponSkin);
+
+  function damageFor(res, def) {
+    const body = (def.pelletHit || 1) * DMG.body;
+    if (res.type === 'head') return DMG.head + DMG.down;
+    if (res.type === 'bodyDown') return body + DMG.down;
+    return body;
+  }
+
+  function popEarn(n) {
+    ui.earn.textContent = '+' + n.toLocaleString('de-DE');
+    restartAnim(ui.earn, 'show');
+  }
+
+  // ---------- Waffenbilder für den Automaten (seitlich gerendert) ----------
+  const iconCache = {};
+  const ICON_W = 480;
+  const ICON_H = 200;
+  let iconRT = null;
+  let iconScene = null;
+  let iconBuf = null;
+  function weaponIcon(index, skinId) {
+    const key = index + ':' + skinId;
+    if (iconCache[key]) return iconCache[key];
+    if (!iconScene) {
+      iconScene = new THREE.Scene();
+      iconScene.environment = world.envMap;
+      iconScene.add(new THREE.HemisphereLight(0xffffff, 0x50584a, 0.6));
+      const key1 = new THREE.DirectionalLight(0xffffff, 1.0);
+      key1.position.set(1, 1.4, 0.4);
+      iconScene.add(key1);
+      iconRT = new THREE.WebGLRenderTarget(ICON_W, ICON_H);
+      iconRT.texture.encoding = THREE.sRGBEncoding;
+      iconBuf = new Uint8Array(ICON_W * ICON_H * 4);
+    }
+    const def = SR.WEAPON_DEFS[index];
+    const m = def.build();
+    SR.applySkin(m.group, def.id, skinId);
+    iconScene.add(m.group);
+    m.group.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(m.group);
+    const size = box.getSize(new V3());
+    const c = box.getCenter(new V3());
+    const aspect = ICON_W / ICON_H;
+    const halfW = Math.max(size.z / 2, (size.y / 2) * aspect) * 1.06;
+    const halfH = halfW / aspect;
+    const cam = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 0.01, 10);
+    cam.position.set(c.x + 2, c.y, c.z);
+    cam.lookAt(c);
+    const prevColor = renderer.getClearColor(new THREE.Color());
+    const prevAlpha = renderer.getClearAlpha();
+    renderer.setRenderTarget(iconRT);
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear();
+    renderer.render(iconScene, cam);
+    renderer.readRenderTargetPixels(iconRT, 0, 0, ICON_W, ICON_H, iconBuf);
+    renderer.setRenderTarget(null);
+    renderer.setClearColor(prevColor, prevAlpha);
+    iconScene.remove(m.group);
+    m.group.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+    });
+    // Pixel umdrehen (WebGL zählt von unten) und verkleinert als Bild speichern
+    const big = document.createElement('canvas');
+    big.width = ICON_W;
+    big.height = ICON_H;
+    const bg = big.getContext('2d');
+    const img = bg.createImageData(ICON_W, ICON_H);
+    const row = ICON_W * 4;
+    for (let y = 0; y < ICON_H; y++) img.data.set(iconBuf.subarray((ICON_H - 1 - y) * row, (ICON_H - y) * row), y * row);
+    bg.putImageData(img, 0, 0);
+    const small = document.createElement('canvas');
+    small.width = ICON_W / 2;
+    small.height = ICON_H / 2;
+    small.getContext('2d').drawImage(big, 0, 0, small.width, small.height);
+    iconCache[key] = small.toDataURL('image/png');
+    return iconCache[key];
+  }
 
   function fmtTime(s) {
     if (s == null) return '–';
@@ -281,6 +424,49 @@
     return hit ? weapons[hit.object.userData.slot] : null;
   }
 
+  function lookAtSlot() {
+    if (state.prone || state.stance > 0.05) return false;
+    camera.getWorldDirection(tmpDir);
+    ray.set(camera.position, tmpDir);
+    ray.near = 0;
+    ray.far = REACH;
+    return ray.intersectObject(slotMachine.hitbox, false).length > 0;
+  }
+
+  // ---------- Skin-Automat bedienen ----------
+  const slotUI = SR.createSlotUI({
+    money: () => econ.money,
+    spend,
+    earn(n) {
+      earn(n);
+      saveEcon();
+    },
+    owns,
+    unlock,
+    equip: equipSkin,
+    equipped: (wid) => econ.equipped[wid] || 'standard',
+    icon: weaponIcon,
+    close: closeSlot,
+  });
+
+  function openSlot() {
+    state.inSlot = true;
+    state.trigger = false;
+    state.aiming = false;
+    state.keys = {};
+    econ.usedSlot = true;
+    slotMachine.pullLever();
+    if (document.pointerLockElement) document.exitPointerLock();
+    slotUI.open();
+  }
+
+  function closeSlot() {
+    slotUI.hide();
+    state.inSlot = false;
+    saveEcon();
+    if (!state.fallback) requestLock();
+  }
+
   // ---------- Schießen ----------
   function fire(w) {
     const d = w.def;
@@ -366,12 +552,13 @@
       fx.impact(h.point, n, 'target', scale, lite);
       let entry = shot.byTarget.get(t);
       if (!entry) {
-        entry = { t, pellets: 0, res: null };
+        entry = { t, pellets: 0, res: null, dmg: 0 };
         shot.byTarget.set(t, entry);
       }
       entry.pellets++;
       const res = t.hit(ud.part, w.def.pelletHit);
       if (res && (!entry.res || RANK[res.type] >= RANK[entry.res.type])) entry.res = res;
+      if (res) entry.dmg += damageFor(res, w.def) * (1 + t.dist / 50);
     } else {
       fx.impact(h.point, n, ud.surface || 'grass', scale, lite);
       if (ud.surface === 'steel' && !shot.ping) {
@@ -384,7 +571,9 @@
   // Nach dem Schuss: Geräusche, Zähler und Treffer-Anzeige (einmal pro Schuss, auch bei Schrot).
   function reportShot(shot) {
     let best = null;
+    let dmg = 0;
     shot.byTarget.forEach((entry) => {
+      dmg += entry.dmg;
       const t = entry.t;
       if (entry.res && entry.res.type === 'head') {
         SR.sound.hitHead(t.dist);
@@ -397,7 +586,14 @@
     if (!best) return;
     stats.hits++;
     const N = SR.BODY_HITS_NEEDED;
-    const extra = shot.pellets > 1 ? ' · ' + best.pellets + (best.pellets === 1 ? ' Kugel' : ' Kugeln') : '';
+    const money = Math.round(dmg);
+    let extra = shot.pellets > 1 ? ' · ' + best.pellets + (best.pellets === 1 ? ' Kugel' : ' Kugeln') : '';
+    if (money > 0) {
+      earn(money);
+      econ.damage += money;
+      popEarn(money);
+      extra += ' · +' + money + ' Taler';
+    }
     if (best.res.type === 'head') showHit('Kopftreffer – umgefallen!' + extra, 'head');
     else if (best.res.type === 'bodyDown') showHit('Körper ' + N + '/' + N + ' – umgefallen!' + extra, 'down');
     else showHit('Körper ' + best.res.hits + '/' + N + extra, 'body');
@@ -464,6 +660,12 @@
     const maxRpm = Math.max.apply(null, SR.WEAPON_DEFS.map((d) => d.rpm));
     ui.wName.textContent = w.def.name;
     ui.wKind.textContent = w.def.kind;
+    const skin = SR.findSkin(w.def.id, econ.equipped[w.def.id]);
+    ui.wSkin.hidden = !skin;
+    if (skin) {
+      ui.wSkin.textContent = 'Skin: ' + skin.name;
+      ui.wSkin.style.setProperty('--rar', SR.RARITY[skin.rarity].color);
+    }
     ui.wRpm.textContent = w.def.rpm + ' Schuss/min';
     ui.wBar.style.width = Math.round((w.def.rpm / maxRpm) * 100) + '%';
     ui.wAmmo.textContent = '∞';
@@ -479,6 +681,8 @@
     setText(ui.sTime, 'time', fmtTime(elapsed));
     setText(ui.sBest, 'best', fmtTime(best));
     setText(ui.sStance, 'stance', state.prone ? 'liegend' : 'stehend');
+    setText(ui.money, 'money', econ.money.toLocaleString('de-DE'));
+    setText(ui.dmgTotal, 'dmg', econ.damage.toLocaleString('de-DE'));
     let next = null;
     targets.forEach((t) => {
       const s = t.secondsUntilUp;
@@ -496,6 +700,8 @@
     if (state.looking) {
       p = '<kbd>E</kbd> ' + state.looking.def.name + ' nehmen';
       if (state.held) p += ' <span>· ' + state.held.def.short + ' kommt zurück auf den Tisch</span>';
+    } else if (state.lookSlot) {
+      p = '<kbd>E</kbd> Skin-Automat benutzen <span>· ' + SR.SPIN_COST + ' Taler pro Dreh</span>';
     } else if (state.prone && !state.held) {
       p = 'Mit <kbd>Strg</kbd> aufstehen, dann eine Waffe vom Tisch nehmen';
     } else if (!state.held) {
@@ -550,7 +756,7 @@
   function enableFallback() {
     if (state.locked) return;
     if (state.lockWorked) {
-      toast('Maus konnte nicht gefangen werden – bitte noch einmal klicken.', 3);
+      setPaused(true);
       return;
     }
     state.fallback = true;
@@ -597,7 +803,7 @@
       state.lockWorked = true;
       state.fallback = false;
       setPaused(false);
-    } else if (state.started && !state.fallback) {
+    } else if (state.started && !state.fallback && !state.inSlot) {
       setPaused(true);
     }
   });
@@ -627,6 +833,13 @@
   window.addEventListener('contextmenu', (e) => e.preventDefault());
 
   window.addEventListener('keydown', (e) => {
+    if (state.inSlot) {
+      if ((e.code === 'Escape' || e.code === 'KeyE') && !slotUI.spinning) {
+        e.preventDefault();
+        closeSlot();
+      }
+      return;
+    }
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].indexOf(e.code) >= 0) e.preventDefault();
     if (!isActive()) return;
     // Strg+Taste soll im Spiel keine Browser-Kürzel auslösen (z. B. Strg+S, Strg+D)
@@ -634,7 +847,11 @@
     state.keys[e.code] = true;
     if (e.repeat) return;
     if (e.code === 'ControlLeft' || e.code === 'ControlRight') toggleProne();
-    else if (e.code === 'KeyE') equip(lookAtWeapon());
+    else if (e.code === 'KeyE') {
+      const lw = lookAtWeapon();
+      if (lw) equip(lw);
+      else if (lookAtSlot()) openSlot();
+    }
     else if (e.code === 'KeyQ') putBack();
     else if (e.code === 'KeyR') resetRound();
     else if (e.code === 'Escape' && state.fallback) setPaused(true);
@@ -663,6 +880,7 @@
   function blocked(x, z) {
     const b = world.bounds;
     if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) return true;
+    if (Math.hypot(x - slotMachine.x, z - slotMachine.z) < slotMachine.radius + 0.3) return true;
     const r = 0.3;
     return x > table.minX - r && x < table.maxX + r && z > table.minZ - r && z < table.maxZ + r;
   }
@@ -769,6 +987,7 @@
       if (look) look.outline.visible = true;
       state.looking = look;
     }
+    state.lookSlot = active && !look ? lookAtSlot() : false;
 
     // Waffe in der Hand
     if (w) {
@@ -853,7 +1072,17 @@
     targets.forEach((t) => t.update(dt));
     fx.update(dt);
     world.update(clock);
+    slotMachine.update(clock, dt);
     checkRound();
+    econSaveT += dt;
+    if (econDirty && econSaveT > 2) {
+      econSaveT = 0;
+      saveEcon();
+    }
+    if (!state.slotHint && !econ.usedSlot && econ.money >= SR.SPIN_COST && isActive() && stats.hits > 0) {
+      state.slotHint = true;
+      toast('Du hast ' + econ.money + ' Taler! Hinten links auf dem Platz steht der Skin-Automat.', 5);
+    }
     updateHud(e);
 
     if (toastTimer > 0) {
@@ -911,6 +1140,12 @@
       return clock;
     },
     toggleProne,
+    econ,
+    openSlot,
+    closeSlot,
+    slotUI,
+    equipSkin,
+    weaponIcon,
     start() {
       state.started = true;
       state.fallback = true;

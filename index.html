@@ -39,12 +39,19 @@
       </dl>
     </section>
 
+    <section id="purse" class="panel" aria-label="Geld">
+      <div class="bal"><i class="coin" aria-hidden="true">T</i><b id="money">0</b><small>Taler</small></div>
+      <div class="dmg">Schaden gesamt <span id="damageTotal">0</span></div>
+      <div id="earn" aria-hidden="true"></div>
+    </section>
+
     <section id="weaponCard" class="panel empty" aria-label="Waffe in der Hand">
       <div class="wHead">
         <span id="wName">Keine Waffe</span>
         <span class="ammo"><small>Munition</small><b id="wAmmo">–</b></span>
       </div>
       <div id="wKind">Die Waffen liegen auf dem Tisch</div>
+      <div id="wSkin" hidden></div>
       <div class="rate"><div class="track"><div id="wBar"></div></div><span id="wRpm">–</span></div>
     </section>
 
@@ -68,12 +75,53 @@
     <div id="toast" hidden></div>
   </div>
 
+  <div id="slot" hidden role="dialog" aria-modal="true" aria-labelledby="slotTitle">
+    <div class="slotWrap">
+      <section class="cabinet">
+        <header class="marquee">
+          <h2 id="slotTitle">Skin-Automat</h2>
+          <div class="wallet"><small>Dein Geld</small><b id="slotMoney">0</b><span>Taler</span></div>
+        </header>
+        <div class="reels">
+          <div class="reel"><div class="strip"></div></div>
+          <div class="reel"><div class="strip"></div></div>
+          <div class="reel"><div class="strip"></div></div>
+          <div class="payline" aria-hidden="true"></div>
+        </div>
+        <div class="spinRow">
+          <button id="spinBtn" type="button">Drehen · 100 Taler</button>
+          <p id="slotMsg" aria-live="polite"></p>
+        </div>
+        <div id="prize" hidden>
+          <img id="prizeImg" alt="">
+          <div class="pz">
+            <span id="prizeRarity" class="rarity"></span>
+            <strong id="prizeName"></strong>
+            <span id="prizeWeapon"></span>
+          </div>
+          <button id="prizeEquip" type="button">Jetzt ausrüsten</button>
+        </div>
+        <details class="odds">
+          <summary>Gewinnchancen</summary>
+          <table><tbody id="oddsBody"></tbody></table>
+          <p>Bei einem Skin-Gewinn bekommst du immer einen Skin, den du noch nicht hast. Seltenheit: Gewöhnlich 50 %, Selten 30 %, Episch 15 %, Legendär 5 %.</p>
+        </details>
+      </section>
+      <section class="collection" aria-labelledby="collTitle">
+        <h3 id="collTitle">Meine Skins <span id="skinCount">0/24</span></h3>
+        <p class="hint">Klick auf einen Skin, den du hast, um ihn auszurüsten.</p>
+        <div id="skinGrid"></div>
+      </section>
+    </div>
+    <button id="slotClose" type="button">Zurück zum Schießstand <kbd>Esc</kbd></button>
+  </div>
+
   <div id="overlay">
     <div class="sheet">
       <header class="intro">
         <p class="eyebrow">Stand 1 · Freigelände</p>
         <h1>Freiluft-<br>Schießstand</h1>
-        <p class="lede">Sechs Waffen liegen auf dem Tisch, zwölf Mannscheiben stehen rundherum im Gelände, zwischen 12 und 70 Metern entfernt. Ein Kopftreffer wirft eine Scheibe sofort um. Am Körper braucht es sechs Treffer. Nach fünf Minuten steht jede Scheibe von selbst wieder auf.</p>
+        <p class="lede">Sechs Waffen liegen auf dem Tisch, zwölf Mannscheiben stehen rundherum im Gelände, zwischen 12 und 70 Metern entfernt. Ein Kopftreffer wirft eine Scheibe sofort um. Am Körper braucht es sechs Treffer. Nach fünf Minuten steht jede Scheibe von selbst wieder auf. Jeder Treffer bringt Taler, die du am Skin-Automaten hinten auf dem Platz gegen Waffen-Skins eintauschen kannst.</p>
         <button id="startBtn" type="button"><span id="startLabel">Spiel starten</span></button>
         <p class="mobile-note">Dieses Spiel braucht Maus und Tastatur.</p>
         <label class="sens" for="sens">
@@ -89,7 +137,7 @@
             <li><kbd>Maus</kbd><span>umsehen und drehen</span></li>
             <li><kbd>Linksklick</kbd><span>schießen, gedrückt halten für Dauerfeuer</span></li>
             <li><kbd>Rechtsklick</kbd><span>zielen (gedrückt halten)</span></li>
-            <li><kbd>E</kbd><span>Waffe vom Tisch nehmen oder tauschen</span></li>
+            <li><kbd>E</kbd><span>Waffe vom Tisch nehmen oder tauschen, Skin-Automat benutzen</span></li>
             <li><kbd>Q</kbd><span>Waffe zurück auf den Tisch legen</span></li>
             <li><kbd>W A S D</kbd><span>auf dem Platz herumgehen</span></li>
             <li><kbd>Strg</kbd><span>hinlegen oder aufstehen (kurz antippen). Im Liegen zielst du ruhiger.</span></li>
@@ -101,6 +149,7 @@
           <h2 id="hWeapons">Kadenz der Waffen</h2>
           <ul class="arsenal" id="arsenal"></ul>
           <p class="note">Alle Waffen haben unendlich Munition. Du kannst immer nur eine Waffe in der Hand halten.</p>
+          <p class="note">Taler pro Treffer: Körper 10, Kopf 60, Umwerfen +20, je weiter weg, desto mehr (70 m = 2,4-fach).</p>
         </section>
       </div>
     </div>
@@ -112,8 +161,10 @@
   <script src="js/audio.js"></script>
   <script src="js/world.js"></script>
   <script src="js/weapons.js"></script>
+  <script src="js/skins.js"></script>
   <script src="js/targets.js"></script>
   <script src="js/effects.js"></script>
+  <script src="js/slot.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

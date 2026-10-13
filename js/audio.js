@@ -170,6 +170,39 @@
       this.noise(t, { type: 'bandpass', freq: 500, freqEnd: 900, q: 1.5, decay: 0.5, gain: 0.08 });
     }
 
+    // ---------- Skin-Automat ----------
+    spinTicks(duration) {
+      if (!this.ready) return;
+      const t0 = this.ctx.currentTime;
+      let t = 0;
+      let gap = 0.05;
+      while (t < duration) {
+        this.noise(t0 + t, { type: 'bandpass', freq: 2600, q: 5, decay: 0.012, gain: 0.12 });
+        t += gap;
+        gap *= 1.045;
+      }
+    }
+
+    reelStop() {
+      if (!this.ready) return;
+      const t = this.ctx.currentTime;
+      this.noise(t, { type: 'lowpass', freq: 500, q: 1, decay: 0.08, gain: 0.45 });
+      this.tone(t, { type: 'square', freq: 180, freqEnd: 120, decay: 0.06, gain: 0.05 });
+    }
+
+    coins() {
+      if (!this.ready) return;
+      const t = this.ctx.currentTime;
+      for (let i = 0; i < 6; i++) this.tone(t + i * 0.07, { type: 'triangle', freq: 1800 + (i % 2) * 500, decay: 0.12, gain: 0.08 });
+    }
+
+    jackpot() {
+      if (!this.ready) return;
+      const t = this.ctx.currentTime;
+      [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => this.tone(t + i * 0.09, { type: 'triangle', freq: f, decay: 0.5, gain: 0.12 }));
+      this.coins();
+    }
+
     win() {
       if (!this.ready) return;
       const t = this.ctx.currentTime;
