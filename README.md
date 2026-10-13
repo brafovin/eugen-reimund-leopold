@@ -1,7 +1,7 @@
 # Freiluft-Schießstand
 
 Ein 3D-Schießstand-Spiel für den Browser (Three.js). Du stehst auf einem Betonplatz auf einem offenen
-Gelände, vor dir liegt ein Tisch mit vier Waffen, rundherum stehen zwölf Mannscheiben in 12 bis 70 Metern
+Gelände, vor dir liegt ein Tisch mit sechs Waffen, rundherum stehen zwölf Mannscheiben in 12 bis 70 Metern
 Entfernung.
 
 ## Spielen
@@ -49,6 +49,16 @@ npx http-server -p 8080 .
 | Double-Action-Revolver | 400 Schuss/min | langsamer als die C96, schneller als das G36; Trommel dreht sich |
 | G36 | 286 Schuss/min | mittel schnell, Zieloptik mit Leuchtpunkt |
 | KR86 | 52 Schuss/min | schießt am langsamsten, Zielfernrohr, Repetieren nach jedem Schuss |
+| Birdshot | 133 Schuss/min | Bockflinte mit 14 kleinen Schrotkugeln und enger Garbe – für **weite** Ziele |
+| SG-21 Treewhacker | 75 Schuss/min | Pumpgun mit 12 groben Schrotkugeln und breiter Garbe – für **nahe** Ziele |
+
+### Schrotflinten
+
+Jeder Schuss verschießt viele Schrotkugeln. Der gestrichelte Kreis im Fadenkreuz zeigt, wie weit die Garbe
+auseinandergeht. Trifft eine Kugel den Kopf, fällt die Scheibe um. Am Körper zählt bei der Treewhacker jede
+Kugel als ein Treffer, beim feinen Vogelschrot der Birdshot zählen etwa drei Kugeln als ein Treffer.
+Auf 12 m wirft die Treewhacker eine Scheibe meist mit einem Schuss um, auf 50 m trifft sie kaum noch.
+Die Birdshot hält die Kugeln enger zusammen und trifft auch auf große Entfernung noch den Kopf.
 
 Die Wartezeit bis zum Aufstehen steht in `js/targets.js` (`SR.TARGET_RESPAWN`, in Sekunden).
 Die Waffenwerte stehen in `js/weapons.js` (`interval` = Sekunden zwischen zwei Schüssen) und lassen sich dort leicht ändern.

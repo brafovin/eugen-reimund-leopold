@@ -178,20 +178,21 @@
     }
 
     // Liefert das Ergebnis des Treffers oder null, wenn die Scheibe schon liegt.
-    hit(kind) {
+    // amount: wie viel ein Körpertreffer zählt (kleiner Vogelschrot zählt weniger als eine Kugel).
+    hit(kind, amount) {
       if (this.state !== 'up') return null;
       if (kind === 'head') {
         this.knockDown(3.4);
         return { type: 'head' };
       }
       if (kind === 'body') {
-        this.hits++;
-        if (this.hits >= BODY_HITS_NEEDED) {
+        this.hits += amount == null ? 1 : amount;
+        if (this.hits >= BODY_HITS_NEEDED - 1e-6) {
           this.knockDown(2.4);
           return { type: 'bodyDown', hits: this.hits };
         }
         this.kick = Math.min(0.12, this.kick + 0.07);
-        return { type: 'body', hits: this.hits };
+        return { type: 'body', hits: Math.floor(this.hits + 1e-6) };
       }
       return null;
     }

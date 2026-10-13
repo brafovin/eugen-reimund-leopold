@@ -18,7 +18,7 @@
     const col = new THREE.Color();
 
     // --- Splitter ---
-    const N = 260;
+    const N = 420;
     const debris = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: 0.9 }), N);
     debris.frustumCulled = false;
     debris.castShadow = false;
@@ -36,7 +36,7 @@
     // --- Staubwölkchen ---
     const softTex = SR.tex.soft();
     const puffs = [];
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 40; i++) {
       const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: softTex, transparent: true, depthWrite: false, opacity: 0 }));
       s.visible = false;
       scene.add(s);
@@ -46,6 +46,7 @@
 
     // --- Hülsen (im Waffen-Blickfeld) ---
     const brass = new THREE.MeshStandardMaterial({ color: 0xcaa047, metalness: 1, roughness: 0.3 });
+    const hullMats = {}; // farbige Schrotpatronen-Hülsen
     const shellGeo = new THREE.CylinderGeometry(1, 1, 1, 10);
     const shells = [];
     for (let i = 0; i < 16; i++) {
@@ -56,11 +57,13 @@
     }
     let nextShell = 0;
 
-    function impact(point, normal, surfaceName, scale) {
+    // lite: kleiner Einschlag für einzelne Schrotkugeln
+    function impact(point, normal, surfaceName, scale, lite) {
       const s = SURFACE[surfaceName] || SURFACE.grass;
       const k = scale || 1;
       const n = normal || new THREE.Vector3(0, 1, 0);
-      for (let i = 0; i < s.count; i++) {
+      const count = lite ? 2 : s.count;
+      for (let i = 0; i < count; i++) {
         const p = parts[nextPart];
         debris.setColorAt(nextPart, col.set(s.color).offsetHSL(0, 0, (Math.random() - 0.5) * 0.1));
         nextPart = (nextPart + 1) % N;
@@ -77,21 +80,28 @@
         p.max = p.life = 0.5 + Math.random() * 0.5;
       }
       debris.instanceColor.needsUpdate = true;
+      if (lite && Math.random() < 0.6) return;
 
       const pf = puffs[nextPuff];
       nextPuff = (nextPuff + 1) % puffs.length;
       pf.sprite.position.copy(point).addScaledVector(n, 0.05);
       pf.sprite.material.color.set(s.dust);
       pf.sprite.visible = true;
-      pf.size = 0.35 * k;
+      pf.size = (lite ? 0.22 : 0.35) * k;
       pf.max = pf.life = 0.9;
       pf.sprite.material.rotation = Math.random() * 6;
     }
 
     // pos/dir im Kamera-Raum (vmScene)
-    function ejectShell(pos, dir, r, len) {
+    function ejectShell(pos, dir, r, len, color) {
       const s = shells[nextShell];
       nextShell = (nextShell + 1) % shells.length;
+      if (color) {
+        if (!hullMats[color]) hullMats[color] = new THREE.MeshStandardMaterial({ color, roughness: 0.55 });
+        s.mesh.material = hullMats[color];
+      } else {
+        s.mesh.material = brass;
+      }
       s.mesh.position.copy(pos);
       s.mesh.scale.set(r, len, r);
       s.mesh.rotation.set(Math.PI / 2, 0, Math.random());

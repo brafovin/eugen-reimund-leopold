@@ -124,6 +124,13 @@
       this.click(0.78, 2600, 0.4);
     }
 
+    // Pumpgun repetieren: zurück – vor
+    pump() {
+      this.click(0.13, 1300, 0.45);
+      this.click(0.29, 900, 0.55);
+      this.click(0.47, 1500, 0.55);
+    }
+
     cylinder() {
       this.click(0.05, 4200, 0.15);
     }

@@ -356,6 +356,125 @@
     };
   }
 
+  // ---- Birdshot (Bockflinte mit langen Läufen, enge Garbe) ----
+  function buildBirdshot() {
+    const m = mats();
+    const g = new THREE.Group();
+    cylZ(0.0095, 0.0105, 0.72, m.steel, 0, 0.055, -0.405, g, 18); // oberer Lauf
+    cylZ(0.0095, 0.0105, 0.72, m.steel, 0, 0.034, -0.405, g, 18); // unterer Lauf
+    cylZ(0.0062, 0.0062, 0.002, m.black, 0, 0.055, -0.7655, g, 10);
+    cylZ(0.0062, 0.0062, 0.002, m.black, 0, 0.034, -0.7655, g, 10);
+    box(0.006, 0.012, 0.7, m.steelDark, 0, 0.0445, -0.41, g); // Steg zwischen den Läufen
+    box(0.009, 0.004, 0.72, m.steelDark, 0, 0.0665, -0.405, g); // Laufschiene
+    add(g, new THREE.Mesh(new THREE.SphereGeometry(0.0024, 10, 8), m.brass), 0, 0.0705, -0.755); // Korn (Perle)
+    add(g, new THREE.Mesh(new THREE.SphereGeometry(0.0016, 8, 6), m.steelBright), 0, 0.069, -0.42); // Mittelperle
+
+    // Basküle (vernickelt) und Abzug
+    box(0.04, 0.06, 0.09, m.steelBright, 0, 0.04, 0.0, g);
+    box(0.034, 0.01, 0.07, m.steel, 0, 0.0045, 0.005, g);
+    cylX(0.008, 0.042, m.steel, 0, 0.022, -0.045, g, 12); // Scharnier
+    box(0.005, 0.012, 0.03, m.steelDark, 0.022, 0.06, 0.035, g); // Öffnungshebel (seitlich)
+    guard(0.017, 0.003, m.steel, 0.0, -0.005, g);
+    box(0.004, 0.018, 0.005, m.steelBright, 0, -0.006, -0.008, g).rotation.x = 0.3;
+
+    // Vorderschaft und Hinterschaft aus Nussbaum
+    profile(
+      [
+        [0.06, 0.03],
+        [0.3, 0.03],
+        [0.32, 0.018],
+        [0.31, 0.004],
+        [0.06, 0.0],
+      ],
+      0.044,
+      m.walnut,
+      0.005,
+      g
+    );
+    profile(
+      [
+        [-0.045, 0.046],
+        [-0.12, 0.036],
+        [-0.42, 0.024],
+        [-0.425, -0.125],
+        [-0.17, -0.07],
+        [-0.115, -0.056],
+        [-0.075, -0.018],
+        [-0.045, 0.012],
+      ],
+      0.04,
+      m.walnut,
+      0.005,
+      g
+    );
+    box(0.05, 0.16, 0.012, m.rubber, 0, -0.05, 0.432, g).rotation.x = -0.06; // Schaftkappe
+
+    return {
+      group: g,
+      muzzle: point(g, 0, 0.055, -0.77),
+      sightY: 0.0725,
+    };
+  }
+
+  // ---- SG-21 Treewhacker (kurze Vorderschaft-Repetierflinte, breite Garbe) ----
+  function buildSG21() {
+    const m = mats();
+    const g = new THREE.Group();
+    box(0.042, 0.065, 0.2, m.steelDark, 0, 0.035, -0.03, g); // Gehäuse
+    box(0.002, 0.022, 0.06, m.black, 0.0215, 0.045, -0.02, g); // Auswurföffnung
+    cylZ(0.0115, 0.0115, 0.4, m.steel, 0, 0.05, -0.33, g, 18); // Lauf
+    cylZ(0.0135, 0.0135, 0.03, m.steelDark, 0, 0.05, -0.53, g, 18); // Mündungsring
+    cylZ(0.0085, 0.0085, 0.002, m.black, 0, 0.05, -0.5455, g, 12);
+    cylZ(0.0105, 0.0105, 0.36, m.steelDark, 0, 0.024, -0.29, g, 16); // Röhrenmagazin
+    box(0.016, 0.03, 0.02, m.steelDark, 0, 0.037, -0.46, g); // Magazinschelle
+    // Ringvisier hinten, Balkenkorn vorne
+    ringZ(0.008, 0.0018, m.steelDark, 0, 0.0795, 0.05, g);
+    box(0.006, 0.006, 0.008, m.steelDark, 0, 0.0705, 0.05, g);
+    box(0.003, 0.022, 0.012, m.steelDark, -0.011, 0.0775, 0.05, g); // Schutzohren
+    box(0.003, 0.022, 0.012, m.steelDark, 0.011, 0.0775, 0.05, g);
+    box(0.003, 0.016, 0.01, m.steelDark, 0, 0.0695, -0.515, g); // Korn
+    box(0.0032, 0.003, 0.01, new THREE.MeshBasicMaterial({ color: 0xff8a1f }), 0, 0.078, -0.515, g); // Leuchtpunkt am Korn
+
+    // Vorderschaft (Pumpe) – gleitet beim Repetieren nach hinten
+    const pump = new THREE.Group();
+    pump.position.set(0, 0.026, -0.26);
+    g.add(pump);
+    box(0.05, 0.04, 0.16, m.polymer, 0, 0, 0, pump);
+    for (let i = 0; i < 6; i++) box(0.052, 0.004, 0.008, m.black, 0, -0.004 + (i % 2) * 0.012, -0.06 + i * 0.024, pump);
+
+    guard(0.016, 0.003, m.polymer, 0.003, 0.04, g);
+    box(0.004, 0.018, 0.005, m.steelBright, 0, -0.006, 0.038, g).rotation.x = 0.3;
+
+    // Schaft mit Pistolengriff
+    profile(
+      [
+        [-0.07, 0.062],
+        [-0.365, 0.055],
+        [-0.37, -0.09],
+        [-0.31, -0.09],
+        [-0.15, -0.03],
+        [-0.145, -0.1],
+        [-0.105, -0.1],
+        [-0.075, 0.0],
+      ],
+      0.038,
+      m.polymer,
+      0.004,
+      g
+    );
+    box(0.044, 0.152, 0.014, m.rubber, 0, -0.016, 0.375, g); // Schaftkappe
+    // Aufkleber „Treewhacker" als oranger Streifen
+    box(0.0395, 0.012, 0.09, new THREE.MeshStandardMaterial({ color: 0xd9822b, roughness: 0.6 }), 0, 0.04, 0.215, g);
+
+    return {
+      group: g,
+      muzzle: point(g, 0, 0.05, -0.55),
+      eject: point(g, 0.024, 0.048, -0.02),
+      pump,
+      sightY: 0.0795,
+    };
+  }
+
   // Kadenz: C96 am schnellsten, dann Revolver, dann G36, KR86 am langsamsten.
   SR.WEAPON_DEFS = [
     {
@@ -459,6 +578,62 @@
       shell: { r: 0.005, len: 0.045, up: 1.0, side: 1.2, delay: 0.45 },
       holeR: 0.007,
       build: buildKR86,
+    },
+    {
+      id: 'birdshot',
+      name: 'Birdshot',
+      short: 'Birdshot',
+      kind: 'Bockflinte · enge Garbe für Entfernung',
+      interval: 0.45,
+      pellets: 14, // Schrotkugeln pro Schuss
+      pelletSpread: 0.011, // Öffnung der Garbe (Bogenmaß)
+      pelletHit: 0.34, // kleiner Vogelschrot: etwa 3 Kugeln = 1 Körpertreffer
+      hipPos: [0.14, -0.19, -0.3],
+      adsZ: -0.32,
+      adsFov: 50,
+      vmAdsFov: 44,
+      adsTime: 0.22,
+      hipSpread: 0.02,
+      adsSpread: 0.002,
+      bloom: 0.004,
+      maxBloom: 0.012,
+      recoil: 0.07,
+      recoilYaw: 0.015,
+      recover: 6,
+      kickBack: 0.06,
+      kickRot: 0.14,
+      sound: { crack: 2200, body: 1000, decay: 0.55, thump: 75, gain: 1.05, echo: 1.0 },
+      shell: null,
+      holeR: 0.0045,
+      build: buildBirdshot,
+    },
+    {
+      id: 'sg21',
+      name: 'SG-21 Treewhacker',
+      short: 'Treewhacker',
+      kind: 'Pumpgun · breite Garbe für nahe Ziele',
+      interval: 0.8,
+      pellets: 12,
+      pelletSpread: 0.045,
+      pelletHit: 1, // grober Schrot (Posten): jede Kugel = 1 Körpertreffer
+      hipPos: [0.14, -0.18, -0.3],
+      adsZ: -0.24,
+      adsFov: 62,
+      vmAdsFov: 46,
+      adsTime: 0.18,
+      hipSpread: 0.012,
+      adsSpread: 0.004,
+      bloom: 0.004,
+      maxBloom: 0.012,
+      recoil: 0.085,
+      recoilYaw: 0.02,
+      recover: 6,
+      kickBack: 0.07,
+      kickRot: 0.2,
+      sound: { crack: 1800, body: 800, decay: 0.6, thump: 65, gain: 1.15, echo: 1.0 },
+      shell: { r: 0.0105, len: 0.065, up: 0.9, side: 1.3, delay: 0.4, color: 0xb3261e },
+      holeR: 0.008,
+      build: buildSG21,
     },
   ];
   SR.WEAPON_DEFS.forEach((d) => {

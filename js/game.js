@@ -11,7 +11,8 @@
   const VM_FOV = 55;
   const BASE_SENS = 0.0022;
   const REACH = 2.7;
-  const SLOT_X = [-0.95, -0.36, 0.28, 0.9];
+  // Plätze auf dem Tisch, gleichmäßig verteilt
+  const SLOT_X = SR.WEAPON_DEFS.map((d, i, all) => (i - (all.length - 1) / 2) * 0.5);
 
   const $ = (id) => document.getElementById(id);
   const ui = {
@@ -22,6 +23,7 @@
     sensOut: $('sensOut'),
     crosshair: $('crosshair'),
     hitmarker: $('hitmarker'),
+    pattern: $('pattern'),
     scope: $('scope'),
     hitText: $('hitText'),
     prompt: $('prompt'),
@@ -128,7 +130,7 @@
     const v = def.build();
     v.group.visible = false;
     weaponRoot.add(v.group);
-    const flash = SR.makeMuzzleFlash(def.id === 'kr86' || def.id === 'g36' ? 0.13 : 0.085);
+    const flash = SR.makeMuzzleFlash(def.pellets ? 0.17 : def.id === 'kr86' || def.id === 'g36' ? 0.13 : 0.085);
     v.muzzle.add(flash);
 
     return { def, index: i, table: t, view: v, hitbox, outline, flash, onTable: true, kick: 0, boltT: 1, ejected: true, shots: 0 };
@@ -263,6 +265,7 @@
 
   const ray = new THREE.Raycaster();
   const tmpDir = new V3();
+  const aimDir = new V3();
   const tmpRight = new V3();
   const tmpUp = new V3();
   const tmpV = new V3();
@@ -289,17 +292,24 @@
     const steady = proneSteady();
     const spread = (lerp(d.hipSpread, d.adsSpread, e) + state.bloom + (state.moving ? 0.012 * (1 - e) : 0)) * steady;
     camera.updateMatrixWorld();
-    camera.getWorldDirection(tmpDir);
+    camera.getWorldDirection(aimDir);
     tmpRight.setFromMatrixColumn(camera.matrixWorld, 0);
     tmpUp.setFromMatrixColumn(camera.matrixWorld, 1);
-    const ang = Math.random() * Math.PI * 2;
-    const rad = Math.sqrt(Math.random()) * spread;
-    tmpDir.addScaledVector(tmpRight, Math.cos(ang) * rad).addScaledVector(tmpUp, Math.sin(ang) * rad).normalize();
-    ray.set(camera.position, tmpDir);
+    jitter(aimDir, spread); // Zielfehler
+
+    // Eine Kugel – oder bei Schrotflinten eine ganze Garbe Schrotkugeln
+    const pellets = d.pellets || 1;
+    const shot = { pellets, byTarget: new Map(), ping: false };
     ray.near = 0.1;
     ray.far = 1200;
-    const hit = ray.intersectObjects(shootables, false)[0];
-    if (hit) handleHit(hit, w);
+    for (let i = 0; i < pellets; i++) {
+      tmpDir.copy(aimDir);
+      if (pellets > 1) jitter(tmpDir, d.pelletSpread);
+      ray.set(camera.position, tmpDir);
+      const hit = ray.intersectObjects(shootables, false)[0];
+      if (hit) handleHit(hit, w, shot);
+    }
+    reportShot(shot);
 
     state.bloom = Math.min(d.maxBloom, state.bloom + d.bloom);
     const calm = lerp(1, 0.6, smooth(state.stance));
@@ -316,10 +326,11 @@
     vmFlashLight.intensity = 2.5;
 
     SR.sound.shot(d.sound);
-    if (d.id === 'kr86') {
+    if (w.view.bolt || w.view.pump) {
       w.boltT = 0;
       w.ejected = false;
-      SR.sound.bolt();
+      if (w.view.bolt) SR.sound.bolt();
+      else SR.sound.pump();
     } else if (d.id === 'revolver') {
       SR.sound.cylinder();
     }
@@ -331,38 +342,65 @@
     w.view.group.updateMatrixWorld(true);
     w.view.eject.getWorldPosition(tmpV);
     const r = 0.8 + Math.random() * 0.4;
-    fx.ejectShell(tmpV, new V3(s.side * r, s.up * r, 0.25 * r), s.r, s.len);
+    fx.ejectShell(tmpV, new V3(s.side * r, s.up * r, 0.25 * r), s.r, s.len, s.color);
   }
 
-  function handleHit(h, w) {
+  function jitter(dir, spread) {
+    if (spread <= 0) return dir;
+    const ang = Math.random() * Math.PI * 2;
+    const rad = Math.sqrt(Math.random()) * spread;
+    return dir.addScaledVector(tmpRight, Math.cos(ang) * rad).addScaledVector(tmpUp, Math.sin(ang) * rad).normalize();
+  }
+
+  const RANK = { body: 1, bodyDown: 2, head: 3 };
+
+  // Ein einzelnes Geschoss (oder eine Schrotkugel) trifft etwas.
+  function handleHit(h, w, shot) {
     const ud = h.object.userData;
     const n = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : new V3(0, 1, 0);
     const scale = 0.7 + h.distance / 22;
+    const lite = shot.pellets > 1;
     if (ud.target && (ud.part === 'body' || ud.part === 'head')) {
       const t = ud.target;
       t.addHole(h, w.def.holeR);
-      fx.impact(h.point, n, 'target', scale);
-      const res = t.hit(ud.part);
-      if (!res) {
-        SR.sound.hitBody(t.dist);
-        return;
+      fx.impact(h.point, n, 'target', scale, lite);
+      let entry = shot.byTarget.get(t);
+      if (!entry) {
+        entry = { t, pellets: 0, res: null };
+        shot.byTarget.set(t, entry);
       }
-      stats.hits++;
-      if (res.type === 'head') {
-        stats.heads++;
+      entry.pellets++;
+      const res = t.hit(ud.part, w.def.pelletHit);
+      if (res && (!entry.res || RANK[res.type] >= RANK[entry.res.type])) entry.res = res;
+    } else {
+      fx.impact(h.point, n, ud.surface || 'grass', scale, lite);
+      if (ud.surface === 'steel' && !shot.ping) {
+        shot.ping = true;
+        SR.sound.hitBody(h.distance);
+      }
+    }
+  }
+
+  // Nach dem Schuss: Geräusche, Zähler und Treffer-Anzeige (einmal pro Schuss, auch bei Schrot).
+  function reportShot(shot) {
+    let best = null;
+    shot.byTarget.forEach((entry) => {
+      const t = entry.t;
+      if (entry.res && entry.res.type === 'head') {
         SR.sound.hitHead(t.dist);
-        showHit('Kopftreffer – umgefallen!', 'head');
-      } else if (res.type === 'bodyDown') {
-        SR.sound.hitBody(t.dist);
-        showHit('Körper ' + SR.BODY_HITS_NEEDED + '/' + SR.BODY_HITS_NEEDED + ' – umgefallen!', 'down');
+        stats.heads++;
       } else {
         SR.sound.hitBody(t.dist);
-        showHit('Körper ' + res.hits + '/' + SR.BODY_HITS_NEEDED, 'body');
       }
-    } else {
-      fx.impact(h.point, n, ud.surface || 'grass', scale);
-      if (ud.surface === 'steel') SR.sound.hitBody(h.distance);
-    }
+      if (entry.res && (!best || RANK[entry.res.type] > RANK[best.res.type])) best = entry;
+    });
+    if (!best) return;
+    stats.hits++;
+    const N = SR.BODY_HITS_NEEDED;
+    const extra = shot.pellets > 1 ? ' · ' + best.pellets + (best.pellets === 1 ? ' Kugel' : ' Kugeln') : '';
+    if (best.res.type === 'head') showHit('Kopftreffer – umgefallen!' + extra, 'head');
+    else if (best.res.type === 'bodyDown') showHit('Körper ' + N + '/' + N + ' – umgefallen!' + extra, 'down');
+    else showHit('Körper ' + best.res.hits + '/' + N + extra, 'body');
   }
 
   // ---------- Runden ----------
@@ -476,15 +514,24 @@
     ui.crosshair.hidden = e > 0.35 || scoped;
     ui.crosshair.classList.toggle('dot', !w);
 
+    let ring = 0;
     if (w) {
       const d = w.def;
-      const spread = (lerp(d.hipSpread, d.adsSpread, e) + state.bloom + (state.moving ? 0.012 : 0)) * proneSteady();
-      const px = (Math.tan(spread) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * (window.innerHeight / 2);
+      const spread = (lerp(d.hipSpread, d.adsSpread, e) + state.bloom + (state.moving ? 0.012 : 0)) * proneSteady() + (d.pelletSpread || 0);
+      const toPx = (a) => (Math.tan(a) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * (window.innerHeight / 2);
+      const px = toPx(spread);
+      // Schrotflinten: Kreis zeigt, wie breit die Garbe auseinandergeht
+      ring = d.pelletSpread ? Math.round(toPx(d.pelletSpread) * 2) : 0;
       const gap = Math.round(clamp(px, 3, 80));
       if (hudCache.gap !== gap) {
         hudCache.gap = gap;
         ui.crosshair.style.setProperty('--gap', gap + 'px');
       }
+    }
+    if (hudCache.ring !== ring) {
+      hudCache.ring = ring;
+      ui.pattern.hidden = !ring;
+      if (ring) ui.pattern.style.setProperty('--d', ring + 'px');
     }
   }
 
@@ -609,6 +656,7 @@
     camera.updateProjectionMatrix();
     vmCamera.updateProjectionMatrix();
     hudCache.gap = null;
+    hudCache.ring = null;
   });
 
   // ---------- Bewegung auf dem Platz ----------
@@ -745,8 +793,21 @@
       g.rotation.set(w.kick * d.kickRot - (1 - eq) * 0.9 - midway * 0.5, state.swayX * 2 * swayK, 0);
 
       // KR86: Kammerstängel hoch, zurück, vor, runter
+      if (v.bolt || v.pump) w.boltT = Math.min(1, w.boltT + dt / (d.interval - 0.05));
+      // SG-21: Vorderschaft zurück und wieder vor, dabei fliegt die Hülse raus
+      if (v.pump) {
+        const p = w.boltT;
+        let back = 0;
+        if (p > 0.15 && p < 0.4) back = (p - 0.15) / 0.25;
+        else if (p >= 0.4 && p < 0.65) back = 1 - (p - 0.4) / 0.25;
+        v.pump.position.z = -0.26 + smooth(back) * 0.06;
+        if (!w.ejected && p >= 0.4) {
+          w.ejected = true;
+          ejectShell(w);
+        }
+        if (p < 1) g.rotation.z = Math.sin(Math.PI * clamp((p - 0.1) / 0.6, 0, 1)) * 0.1 * (1 - e);
+      }
       if (v.bolt) {
-        w.boltT = Math.min(1, w.boltT + dt / (d.interval - 0.05));
         const p = w.boltT;
         let rot = 0;
         let back = 0;

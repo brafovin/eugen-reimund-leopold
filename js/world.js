@@ -4,7 +4,7 @@
   const SR = (window.SR = window.SR || {});
 
   const PAD_TOP = 0.1;
-  const TABLE = { z: -1.15, width: 2.6, depth: 1.36, height: 0.85 };
+  const TABLE = { z: -1.15, width: 3.2, depth: 1.36, height: 0.85 };
 
   function mesh(geo, mat, x, y, z, opts) {
     const m = new THREE.Mesh(geo, mat);

@@ -335,6 +335,20 @@ kbd {
   border-radius: 50%;
 }
 
+/* Streukreis der Schrotflinten */
+#pattern {
+  --d: 40px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--d);
+  height: var(--d);
+  transform: translate(-50%, -50%);
+  border: 1px dashed rgba(235, 227, 200, 0.75);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
 #hitmarker {
   position: absolute;
   left: 50%;
