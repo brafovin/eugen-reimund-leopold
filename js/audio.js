@@ -139,6 +139,7 @@
 
     // Bogen: Sehne schnellt, Pfeil zischt
     bowShot(dist, pan) {
+      if (!this.ready) return;
       const f = () => {
         const t = this.ctx.currentTime + 0.003 + (this.delay || 0);
         this.tone(t, { type: 'triangle', freq: 190, freqEnd: 95, decay: 0.16, gain: 0.3 });
