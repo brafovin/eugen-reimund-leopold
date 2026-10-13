@@ -29,6 +29,17 @@
       lensDark: new THREE.MeshStandardMaterial({ color: 0x0b1018, metalness: 1, roughness: 0.1 }),
       rubber: new THREE.MeshStandardMaterial({ color: 0x121212, roughness: 0.95 }),
     };
+    // Feine Oberflächenstruktur: gebürstetes Metall und genarbter Kunststoff
+    const brushed = SR.tex.grain(3, true);
+    const pebble = SR.tex.grain(8, false);
+    ['steel', 'steelDark', 'steelBright'].forEach((k) => {
+      M[k].bumpMap = brushed;
+      M[k].bumpScale = 0.5;
+    });
+    ['polymer', 'polymerDark', 'polymerDS', 'rubber'].forEach((k) => {
+      M[k].bumpMap = pebble;
+      M[k].bumpScale = 0.9;
+    });
     // Rolle jedes Materials – Skins ersetzen Materialien anhand dieser Rolle (siehe skins.js)
     const ROLES = {
       steel: 'metal',
@@ -55,8 +66,38 @@
     parent.add(m);
     return m;
   }
+  // Kantengerundeter Quader (wie RoundedBoxGeometry): Kanten fangen das Licht und sehen nicht mehr kantig aus.
+  const _rp = new THREE.Vector3();
+  const _rn = new THREE.Vector3();
+  function roundedBoxGeo(w, h, d, radius) {
+    const r = Math.min(radius, w * 0.42, h * 0.42, d * 0.42);
+    if (r < 0.0004) return new THREE.BoxGeometry(w, h, d);
+    const segs = 3;
+    const g = new THREE.BoxGeometry(1, 1, 1, segs, segs, segs).toNonIndexed();
+    const pos = g.attributes.position.array;
+    const nor = g.attributes.normal.array;
+    const bx = w / 2 - r;
+    const by = h / 2 - r;
+    const bz = d / 2 - r;
+    const half = 0.5 / segs;
+    for (let i = 0; i < pos.length; i += 3) {
+      _rp.set(pos[i], pos[i + 1], pos[i + 2]);
+      _rn.copy(_rp);
+      _rn.x -= Math.sign(_rn.x) * half;
+      _rn.y -= Math.sign(_rn.y) * half;
+      _rn.z -= Math.sign(_rn.z) * half;
+      _rn.normalize();
+      pos[i] = bx * Math.sign(_rp.x) + _rn.x * r;
+      pos[i + 1] = by * Math.sign(_rp.y) + _rn.y * r;
+      pos[i + 2] = bz * Math.sign(_rp.z) + _rn.z * r;
+      nor[i] = _rn.x;
+      nor[i + 1] = _rn.y;
+      nor[i + 2] = _rn.z;
+    }
+    return g;
+  }
   function box(w, h, d, mat, x, y, z, parent) {
-    return add(parent, new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat), x, y, z);
+    return add(parent, new THREE.Mesh(roundedBoxGeo(w, h, d, 0.0035), mat), x, y, z);
   }
   // Zylinder entlang Z; rFront zeigt nach vorne (-Z)
   function cylZ(rFront, rBack, len, mat, x, y, z, parent, seg, open) {
@@ -105,6 +146,9 @@
     const o = new THREE.Object3D();
     return add(parent, o, x, y, z);
   }
+
+  // Bau-Helfer für weitere Waffen-Dateien (weapons2.js)
+  SR.mk = { mats, add, box, cylZ, cylY, cylX, ringZ, guard, profile, point, roundedBoxGeo };
 
   // ---- Mauser C96 ----
   function buildC96() {

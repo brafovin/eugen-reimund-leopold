@@ -469,6 +469,26 @@
       return toTexture(c, [1, 1]);
     },
 
+    // Graustufen-Körnung für Bump-Maps (gebürstetes Metall, Kunststoff-Narbung)
+    grain(seed, streaks) {
+      const S = 128;
+      const c = makeCanvas(S, S);
+      const g = c.getContext('2d');
+      const r = rng(seed || 17);
+      g.fillStyle = '#808080';
+      g.fillRect(0, 0, S, S);
+      for (let i = 0; i < 2600; i++) {
+        const v = Math.floor(80 + r() * 100);
+        g.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')';
+        const w = streaks ? 4 + r() * 22 : 1 + r() * 1.4;
+        g.fillRect(r() * S, r() * S, w, streaks ? 1 : 1 + r() * 1.4);
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = SR.maxAniso || 4;
+      return t;
+    },
+
     soft() {
       const S = 64;
       const c = makeCanvas(S, S);
