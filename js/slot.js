@@ -6,7 +6,7 @@
   SR.SPIN_COST = 100;
   // Gewinnchancen pro Dreh (werden auch im Automaten angezeigt)
   SR.SLOT_ODDS = [
-    { type: 'secretWeapon', weapon: 'phantom', chance: 0.0099, label: 'Geheimwaffe Phantom-X' },
+    { type: 'secretWeapon', weapon: 'phantom', chance: 0.0499, label: 'Geheimwaffe Phantom-X' },
     { type: 'secretSkin', weapon: 'phantom', skin: 'galaxie', chance: 0.0099, label: 'Geheim-Skin „Galaxie“' },
     { type: 'secretSkin', weapon: 'phantom', skin: 'regenbogen', chance: 0.0099, label: 'Geheim-Skin „Regenbogen“' },
     { type: 'secretSkin', weapon: 'phantom', skin: 'diamant', chance: 0.0099, label: 'Geheim-Skin „Diamant“' },
@@ -14,9 +14,10 @@
     { type: 'money', amount: 250, chance: 0.05, label: '250 Taler' },
     { type: 'money', amount: 100, chance: 0.08, label: '100 Taler' },
     { type: 'money', amount: 50, chance: 0.12, label: '50 Taler' },
-    { type: 'none', chance: 0.3104, label: 'Niete' },
+    { type: 'none', chance: 0.2704, label: 'Niete' },
   ];
-  // Prozent schön auf Deutsch: 40 %, 0,99 %, 31,04 %
+  SR.secretWeaponChance = () => SR.SLOT_ODDS.find((o) => o.type === 'secretWeapon').chance;
+  // Prozent schön auf Deutsch: 40 %, 0,99 %, 27,04 %
   SR.fmtChance = (c) => {
     const v = Math.round(c * 10000) / 100;
     return (Number.isInteger(v) ? String(v) : v.toFixed(2).replace('.', ',')) + ' %';
@@ -433,7 +434,7 @@
             '</button>'
           );
         });
-        const title = d.secret ? (hasWeapon ? 'Geheimwaffe · ' + d.name : '??? · Geheimwaffe (0,99 % pro Dreh)') : d.name;
+        const title = d.secret ? (hasWeapon ? 'Geheimwaffe · ' + d.name : '??? · Geheimwaffe (' + SR.fmtChance(SR.secretWeaponChance()) + ' pro Dreh)') : d.name;
         return '<div class="wrow' + (d.secret ? ' secret' : '') + '"><h4>' + title + '</h4><div class="tiles">' + tiles.join('') + '</div></div>';
       });
       el.grid.innerHTML = rows.join('');

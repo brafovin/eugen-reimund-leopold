@@ -1152,7 +1152,7 @@
         if (d.secret) {
           li.className = 'secret';
           li.innerHTML =
-            '<span class="n">???</span><span class="k">Geheimwaffe · nur am Skin-Automaten (0,99 %)</span>' +
+            '<span class="n">???</span><span class="k">Geheimwaffe · nur am Skin-Automaten (' + SR.fmtChance(SR.secretWeaponChance()) + ')</span>' +
             '<span class="bar"><i style="width:0"></i></span><span class="v">?</span>';
         } else {
           li.innerHTML =

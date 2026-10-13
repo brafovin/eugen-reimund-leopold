@@ -54,7 +54,7 @@ Hinten links auf dem Platz steht der **Skin-Automat**. Hinschauen und **E** drü
 
 | Ergebnis | Chance |
 | --- | --- |
-| Geheimwaffe Phantom-X (3 Geheim-Symbole) | 0,99 % |
+| Geheimwaffe Phantom-X (3 Geheim-Symbole) | 4,99 % |
 | Geheim-Skin „Galaxie“ | 0,99 % |
 | Geheim-Skin „Regenbogen“ | 0,99 % |
 | Geheim-Skin „Diamant“ | 0,99 % |
@@ -62,7 +62,7 @@ Hinten links auf dem Platz steht der **Skin-Automat**. Hinschauen und **E** drü
 | 250 Taler | 5 % |
 | 100 Taler | 8 % |
 | 50 Taler | 12 % |
-| Niete | 31,04 % |
+| Niete | 27,04 % |
 
 Bei einem normalen Skin-Gewinn gibt es immer einen Skin, den du noch nicht hast. Die Seltenheit wird so ausgelost:
 Gewöhnlich 50 %, Selten 30 %, Episch 15 %, Legendär 5 %. Gewinnst du die Geheimwaffe oder einen Geheim-Skin
