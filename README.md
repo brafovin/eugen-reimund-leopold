@@ -1,7 +1,7 @@
 # Freiluft-Schießstand
 
 Ein 3D-Schießstand-Spiel für den Browser (Three.js). Du stehst auf einem Betonplatz auf einem offenen
-Gelände, vor dir liegt ein Tisch mit sechs Waffen, rundherum stehen zwölf Mannscheiben in 12 bis 70 Metern
+Gelände, vor dir liegt ein Tisch mit sechs Waffen (plus einer Geheimwaffe, die man erst gewinnen muss), rundherum stehen zwölf Mannscheiben in 12 bis 70 Metern
 Entfernung.
 
 ## Spielen
@@ -43,28 +43,41 @@ npx http-server -p 8080 .
 
 ## Taler und Skin-Automat
 
-Jeder Treffer macht Schaden, und der Schaden wird dir als **Taler** gutgeschrieben (oben rechts):
+Jeder Treffer bringt **Taler** (oben rechts):
 
 | Treffer | Taler |
 | --- | --- |
-| Körpertreffer | 10 (Schrot anteilig: Birdshot-Kugel ≈ 3,4, Treewhacker-Kugel 10) |
-| Kopftreffer | 60 |
-| Scheibe umgeworfen | +20 |
-| Weitschuss-Bonus | alles × (1 + Entfernung / 50 m), z. B. 70 m = 2,4-fach |
+| Kopftreffer | 50 |
+| Körpertreffer | zufällig 35 bis 45 (feiner Vogelschrot der Birdshot zählt anteilig, etwa 3 Kugeln = 1 Treffer) |
 
 Hinten links auf dem Platz steht der **Skin-Automat**. Hinschauen und **E** drücken. Ein Dreh kostet 100 Taler.
 
 | Ergebnis | Chance |
 | --- | --- |
+| Geheimwaffe Phantom-X (3 Geheim-Symbole) | 0,99 % |
+| Geheim-Skin „Galaxie“ | 0,99 % |
+| Geheim-Skin „Regenbogen“ | 0,99 % |
+| Geheim-Skin „Diamant“ | 0,99 % |
 | Neuer Skin (3 gleiche Waffen) | 40 % |
 | 250 Taler | 5 % |
 | 100 Taler | 8 % |
 | 50 Taler | 12 % |
-| Niete | 35 % |
+| Niete | 31,04 % |
 
-Bei einem Skin-Gewinn gibt es immer einen Skin, den du noch nicht hast. Die Seltenheit wird so ausgelost:
-Gewöhnlich 50 %, Selten 30 %, Episch 15 %, Legendär 5 %. Im Automaten kannst du unter „Meine Skins“
-jeden gewonnenen Skin ausrüsten. Geld und Skins werden im Browser gespeichert.
+Bei einem normalen Skin-Gewinn gibt es immer einen Skin, den du noch nicht hast. Die Seltenheit wird so ausgelost:
+Gewöhnlich 50 %, Selten 30 %, Episch 15 %, Legendär 5 %. Gewinnst du die Geheimwaffe oder einen Geheim-Skin
+ein zweites Mal, gibt es stattdessen 500 bzw. 250 Taler. Im Automaten kannst du unter „Meine Skins“ jeden
+gewonnenen Skin ausrüsten. Geld, Skins und die Geheimwaffe werden im Browser gespeichert.
+
+### Geheimwaffe: Phantom-X
+
+Ein Energiegewehr, das es **nur am Skin-Automaten** gibt. Bis du es gewonnen hast, steht auf dem Tisch nur „? ? ?“.
+Danach liegt es ganz rechts auf dem Tisch.
+
+- 600 Schuss/min, schießt einen leuchtenden Energiestrahl, keine Streuung beim Zielen
+- jeder Körpertreffer zählt doppelt: 3 Treffer werfen eine Scheibe um
+- Holo-Visier mit Leuchtpunkt
+- drei Geheim-Skins: Galaxie, Regenbogen, Diamant (je 0,99 % pro Dreh)
 
 | Waffe | Gewöhnlich | Selten | Episch | Legendär |
 | --- | --- | --- | --- | --- |
@@ -74,6 +87,7 @@ jeden gewonnenen Skin ausrüsten. Geld und Skins werden im Browser gespeichert.
 | KR86 | Birke | Waldtarn | Ebenholz | Königsgold |
 | Birdshot | Jagdgrün | Jagdgravur | Bernstein | Platin |
 | SG-21 Treewhacker | Signal-Orange | Holzfäller | Moos | Lava |
+| Phantom-X (geheim) | – | – | – | Galaxie, Regenbogen, Diamant (Seltenheit „Geheim“) |
 
 Die Skins stehen in `js/skins.js`, der Automat in `js/slot.js`.
 

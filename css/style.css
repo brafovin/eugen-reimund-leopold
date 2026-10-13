@@ -892,6 +892,45 @@ h1 {
   line-height: 42px;
   color: #7c1c1a;
 }
+.sym .gem {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  transform: rotate(45deg);
+  background: linear-gradient(135deg, #ff8cc6, #c21d6e);
+  box-shadow: 0 0 12px rgba(255, 79, 163, 0.8);
+  color: transparent;
+  font: 400 24px/1 var(--display);
+  font-style: normal;
+  position: relative;
+}
+.sym .gem::after {
+  content: '?';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transform: rotate(-45deg);
+  color: #fff;
+}
+.sym.secret span {
+  color: #c21d6e;
+}
+.odds tr.secret td {
+  color: #ff8cc6;
+}
+.wrow.secret h4 {
+  color: #ff8cc6;
+}
+.wrow.secret .tile {
+  background: rgba(255, 79, 163, 0.07);
+}
+.arsenal li.secret .n,
+.arsenal li.secret .v {
+  color: #ff8cc6;
+}
 .payline {
   position: absolute;
   left: 4px;

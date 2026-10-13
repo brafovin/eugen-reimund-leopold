@@ -92,6 +92,31 @@
       pf.sprite.material.rotation = Math.random() * 6;
     }
 
+    // --- Energiestrahlen (Phantom-X) ---
+    const beamGeo = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true).rotateX(Math.PI / 2);
+    const beams = [];
+    for (let i = 0; i < 10; i++) {
+      const m = new THREE.Mesh(
+        beamGeo,
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false })
+      );
+      m.visible = false;
+      m.frustumCulled = false;
+      scene.add(m);
+      beams.push({ mesh: m, life: 0, max: 1, len: 1 });
+    }
+    let nextBeam = 0;
+    function beam(from, to, color) {
+      const b = beams[nextBeam];
+      nextBeam = (nextBeam + 1) % beams.length;
+      b.len = from.distanceTo(to);
+      b.mesh.position.copy(from).add(to).multiplyScalar(0.5);
+      b.mesh.lookAt(to);
+      b.mesh.material.color.set(color);
+      b.mesh.visible = true;
+      b.max = b.life = 0.14;
+    }
+
     // pos/dir im Kamera-Raum (vmScene)
     function ejectShell(pos, dir, r, len, color) {
       const s = shells[nextShell];
@@ -153,6 +178,19 @@
         pf.sprite.material.opacity = 0.55 * (1 - k) * Math.min(1, k * 8);
       });
 
+      beams.forEach((b) => {
+        if (b.life <= 0) return;
+        b.life -= dt;
+        if (b.life <= 0) {
+          b.mesh.visible = false;
+          return;
+        }
+        const k = b.life / b.max;
+        const w = 0.006 + (1 - k) * 0.012;
+        b.mesh.scale.set(w, w, b.len);
+        b.mesh.material.opacity = k;
+      });
+
       shells.forEach((s) => {
         if (s.life <= 0) return;
         s.life -= dt;
@@ -168,6 +206,6 @@
       });
     }
 
-    return { impact, ejectShell, update };
+    return { impact, ejectShell, beam, update };
   };
 })();

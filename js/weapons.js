@@ -492,6 +492,90 @@
     };
   }
 
+  // ---- Phantom-X (Geheimwaffe, Energiegewehr) ----
+  let PM = null;
+  function phantomMats() {
+    if (PM) return PM;
+    const role = (m, r) => {
+      m.userData.role = r;
+      return m;
+    };
+    PM = {
+      white: role(new THREE.MeshStandardMaterial({ color: 0xe9edf2, roughness: 0.32, metalness: 0.1 }), 'poly'),
+      black: role(new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.5, metalness: 0.3 }), 'polyDark'),
+      metal: role(new THREE.MeshStandardMaterial({ color: 0x9aa3ad, metalness: 1, roughness: 0.22 }), 'metal'),
+      energy: role(new THREE.MeshStandardMaterial({ color: 0x9ff3ff, emissive: 0x3fdcff, emissiveIntensity: 2.2, roughness: 0.3 }), 'energy'),
+      cell: role(
+        new THREE.MeshStandardMaterial({ color: 0x8fefff, emissive: 0x2bbfe8, emissiveIntensity: 1.3, roughness: 0.2, transparent: true, opacity: 0.8 }),
+        'energy'
+      ),
+      glass: new THREE.MeshStandardMaterial({ color: 0x9fe8ff, roughness: 0, metalness: 0.4, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide }),
+      dot: new THREE.MeshBasicMaterial({ color: 0xff3355, toneMapped: false }),
+    };
+    return PM;
+  }
+
+  function buildPhantom() {
+    const m = phantomMats();
+    const g = new THREE.Group();
+    box(0.052, 0.07, 0.4, m.white, 0, 0.03, -0.1, g); // Gehäuse
+    box(0.054, 0.02, 0.26, m.black, 0, 0.008, -0.12, g);
+    box(0.056, 0.006, 0.22, m.energy, 0, 0.04, -0.12, g); // Leuchtstreifen
+    box(0.02, 0.008, 0.3, m.black, 0, 0.069, -0.1, g); // Schiene oben
+    box(0.044, 0.052, 0.2, m.white, 0, 0.03, -0.4, g); // vorderer Mantel
+    for (let i = 0; i < 4; i++) ringZ(0.031, 0.0045, m.energy, 0, 0.03, -0.33 - i * 0.045, g); // Energiespulen
+    box(0.008, 0.01, 0.24, m.metal, 0, 0.053, -0.6, g); // Schienen
+    box(0.008, 0.01, 0.24, m.metal, 0, 0.007, -0.6, g);
+    box(0.006, 0.05, 0.02, m.metal, 0, 0.03, -0.49, g);
+    cylZ(0.005, 0.005, 0.25, m.energy, 0, 0.03, -0.6, g, 10); // Energiekern
+    ringZ(0.026, 0.005, m.metal, 0, 0.03, -0.72, g);
+
+    // Energiezelle (statt Magazin)
+    cylY(0.018, 0.018, 0.1, m.cell, 0, -0.04, -0.08, g, 18);
+    cylY(0.021, 0.021, 0.012, m.metal, 0, -0.093, -0.08, g, 18);
+    cylY(0.021, 0.021, 0.012, m.metal, 0, 0.012, -0.08, g, 18);
+
+    const grip = new THREE.Group();
+    grip.position.set(0, -0.045, 0.06);
+    grip.rotation.x = -0.3;
+    g.add(grip);
+    box(0.03, 0.1, 0.04, m.black, 0, 0, 0, grip);
+    guard(0.016, 0.003, m.black, -0.005, 0.025, g);
+    box(0.005, 0.02, 0.005, m.metal, 0, -0.012, 0.022, g).rotation.x = 0.3;
+
+    profile(
+      [
+        [-0.1, 0.062],
+        [-0.36, 0.05],
+        [-0.385, 0.03],
+        [-0.385, -0.085],
+        [-0.33, -0.085],
+        [-0.2, -0.005],
+        [-0.1, -0.005],
+      ],
+      0.036,
+      m.black,
+      0.004,
+      g
+    );
+    box(0.04, 0.12, 0.014, m.white, 0, -0.025, 0.392, g); // Schaftkappe
+
+    // Holo-Visier mit Leuchtpunkt
+    box(0.02, 0.026, 0.05, m.black, 0, 0.082, 0.0, g);
+    box(0.004, 0.054, 0.008, m.black, -0.022, 0.12, -0.005, g);
+    box(0.004, 0.054, 0.008, m.black, 0.022, 0.12, -0.005, g);
+    box(0.048, 0.004, 0.008, m.black, 0, 0.147, -0.005, g);
+    box(0.048, 0.004, 0.008, m.black, 0, 0.095, -0.005, g);
+    add(g, new THREE.Mesh(new THREE.PlaneGeometry(0.04, 0.048), m.glass), 0, 0.12, -0.005);
+    add(g, new THREE.Mesh(new THREE.SphereGeometry(0.0012, 8, 6), m.dot), 0, 0.12, -0.0065);
+
+    return {
+      group: g,
+      muzzle: point(g, 0, 0.03, -0.735),
+      sightY: 0.12,
+    };
+  }
+
   // Kadenz: C96 am schnellsten, dann Revolver, dann G36, KR86 am langsamsten.
   SR.WEAPON_DEFS = [
     {
@@ -652,6 +736,34 @@
       holeR: 0.008,
       build: buildSG21,
     },
+    {
+      id: 'phantom',
+      name: 'Phantom-X',
+      short: 'Phantom',
+      kind: 'Geheimwaffe · Energiegewehr',
+      secret: true, // nur am Skin-Automaten zu gewinnen
+      laser: true,
+      beamColor: 0x5fe8ff,
+      interval: 0.1,
+      bodyHits: 2, // jeder Körpertreffer zählt doppelt: 3 Treffer werfen um
+      hipPos: [0.14, -0.2, -0.3],
+      adsZ: -0.32,
+      adsFov: 45,
+      vmAdsFov: 42,
+      adsTime: 0.15,
+      hipSpread: 0.008,
+      adsSpread: 0,
+      bloom: 0.0008,
+      maxBloom: 0.004,
+      recoil: 0.004,
+      recoilYaw: 0.002,
+      recover: 12,
+      kickBack: 0.015,
+      kickRot: 0.02,
+      shell: null,
+      holeR: 0.006,
+      build: buildPhantom,
+    },
   ];
   SR.WEAPON_DEFS.forEach((d) => {
     d.rpm = Math.round(60 / d.interval);
@@ -659,10 +771,11 @@
 
   // Mündungsfeuer (wird an die Mündung gehängt)
   let flashTex = null;
-  SR.makeMuzzleFlash = function (size) {
+  SR.makeMuzzleFlash = function (size, color) {
     if (!flashTex) flashTex = SR.tex.flash();
     const grp = new THREE.Group();
     const mat = new THREE.MeshBasicMaterial({
+      color: color != null ? color : 0xffffff,
       map: flashTex,
       transparent: true,
       blending: THREE.AdditiveBlending,

@@ -6,12 +6,21 @@
   SR.SPIN_COST = 100;
   // Gewinnchancen pro Dreh (werden auch im Automaten angezeigt)
   SR.SLOT_ODDS = [
+    { type: 'secretWeapon', weapon: 'phantom', chance: 0.0099, label: 'Geheimwaffe Phantom-X' },
+    { type: 'secretSkin', weapon: 'phantom', skin: 'galaxie', chance: 0.0099, label: 'Geheim-Skin „Galaxie“' },
+    { type: 'secretSkin', weapon: 'phantom', skin: 'regenbogen', chance: 0.0099, label: 'Geheim-Skin „Regenbogen“' },
+    { type: 'secretSkin', weapon: 'phantom', skin: 'diamant', chance: 0.0099, label: 'Geheim-Skin „Diamant“' },
     { type: 'skin', chance: 0.4, label: 'Neuer Skin (3 gleiche Waffen)' },
     { type: 'money', amount: 250, chance: 0.05, label: '250 Taler' },
     { type: 'money', amount: 100, chance: 0.08, label: '100 Taler' },
     { type: 'money', amount: 50, chance: 0.12, label: '50 Taler' },
-    { type: 'none', chance: 0.35, label: 'Niete' },
+    { type: 'none', chance: 0.3104, label: 'Niete' },
   ];
+  // Prozent schön auf Deutsch: 40 %, 0,99 %, 31,04 %
+  SR.fmtChance = (c) => {
+    const v = Math.round(c * 10000) / 100;
+    return (Number.isInteger(v) ? String(v) : v.toFixed(2).replace('.', ',')) + ' %';
+  };
 
   // ---------- 3D-Automat ----------
   function signTexture(lines, opts) {
@@ -157,7 +166,8 @@
   };
 
   // ---------- Bedienfeld ----------
-  // api: { money(), spend(n), earn(n), owns(wid, sid), unlock(wid, sid), equip(wid, sid), equipped(wid), icon(index, sid), close() }
+  // api: { money(), spend(n), earn(n), owns(wid, sid), unlock(wid, sid), equip(wid, sid), equipped(wid),
+  //        ownsWeapon(wid), unlockWeapon(wid), icon(index, sid), close() }
   SR.createSlotUI = function (api) {
     const $ = (id) => document.getElementById(id);
     const el = {
@@ -184,8 +194,13 @@
     let spinning = false;
     let lastPrize = null;
 
-    // Walzensymbole: jede Waffe, Taler, Niete
-    const SYMBOLS = DEFS.map((d, i) => ({ kind: 'weapon', index: i })).concat([{ kind: 'money' }, { kind: 'none' }]);
+    // Walzensymbole: jede normale Waffe, Taler, Niete und das Geheim-Symbol
+    const MONEY = { kind: 'money' };
+    const NONE = { kind: 'none' };
+    const SECRET = { kind: 'secret' };
+    const SYMBOLS = DEFS.map((d, i) => (d.secret ? null : { kind: 'weapon', index: i }))
+      .filter(Boolean)
+      .concat([MONEY, NONE, SECRET]);
     const randSym = () => SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
 
     function symEl(sym) {
@@ -200,6 +215,8 @@
         d.append(img, label);
       } else if (sym.kind === 'money') {
         d.innerHTML = '<i class="coin">T</i><span>Taler</span>';
+      } else if (sym.kind === 'secret') {
+        d.innerHTML = '<i class="gem">?</i><span>Geheim</span>';
       } else {
         d.innerHTML = '<i class="blank">✕</i><span>Niete</span>';
       }
@@ -221,7 +238,9 @@
     }
 
     // Gewinnchancen-Tabelle
-    el.odds.innerHTML = SR.SLOT_ODDS.map((o) => '<tr><td>' + o.label + '</td><td>' + Math.round(o.chance * 100) + ' %</td></tr>').join('');
+    el.odds.innerHTML = SR.SLOT_ODDS.map(
+      (o) => '<tr' + (o.type.indexOf('secret') === 0 ? ' class="secret"' : '') + '><td>' + o.label + '</td><td>' + SR.fmtChance(o.chance) + '</td></tr>'
+    ).join('');
 
     function pickWeighted(list, weightOf) {
       const total = list.reduce((n, x) => n + weightOf(x), 0);
@@ -236,13 +255,23 @@
     // Ergebnis eines Drehs. Skins: nur welche, die man noch nicht hat (keine Doppelten).
     function roll() {
       const o = pickWeighted(SR.SLOT_ODDS, (x) => x.chance);
+      const secretIndex = DEFS.findIndex((d) => d.id === o.weapon);
+      if (o.type === 'secretWeapon') {
+        if (api.ownsWeapon(o.weapon)) return { type: 'money', amount: 500, reason: 'secretWeapon', secret: true };
+        return { type: 'secretWeapon', index: secretIndex };
+      }
+      if (o.type === 'secretSkin') {
+        if (api.owns(o.weapon, o.skin)) return { type: 'money', amount: 250, reason: 'secretSkin', secret: true };
+        return { type: 'skin', index: secretIndex, skin: SR.findSkin(o.weapon, o.skin), secret: true };
+      }
       if (o.type === 'skin') {
         const pool = [];
-        DEFS.forEach((d, i) =>
+        DEFS.forEach((d, i) => {
+          if (d.secret) return; // Geheim-Skins haben ihre eigene Chance
           SR.skinList(d.id).forEach((s) => {
             if (!api.owns(d.id, s.id)) pool.push({ index: i, skin: s });
-          })
-        );
+          });
+        });
         if (!pool.length) return { type: 'money', amount: 300, complete: true };
         const p = pickWeighted(pool, (x) => SR.RARITY[x.skin.rarity].weight);
         return { type: 'skin', index: p.index, skin: p.skin };
@@ -251,11 +280,12 @@
     }
 
     function symbolsFor(out) {
+      if (out.secret || out.type === 'secretWeapon') return [SECRET, SECRET, SECRET];
       if (out.type === 'skin') {
-        const s = { kind: 'weapon', index: out.index };
+        const s = SYMBOLS.find((x) => x.index === out.index);
         return [s, s, s];
       }
-      if (out.type === 'money') return [SYMBOLS[DEFS.length], SYMBOLS[DEFS.length], SYMBOLS[DEFS.length]];
+      if (out.type === 'money') return [MONEY, MONEY, MONEY];
       // Niete: niemals drei gleiche
       let a;
       do {
@@ -322,7 +352,24 @@
 
     function finish(out) {
       spinning = false;
-      if (out.type === 'skin') {
+      if (out.type === 'secretWeapon') {
+        const d = DEFS[out.index];
+        api.unlockWeapon(d.id);
+        const r = SR.RARITY[SR.SECRET_RARITY];
+        lastPrize = null;
+        el.prizeImg.src = api.icon(out.index, 'standard');
+        el.prizeImg.alt = d.name;
+        el.prizeRarity.textContent = r.name + 'waffe';
+        el.prize.style.setProperty('--rar', r.color);
+        el.prizeName.textContent = d.name;
+        el.prizeWeapon.textContent = d.kind + ' · liegt jetzt auf dem Tisch';
+        el.prizeEquip.hidden = true;
+        el.prize.hidden = false;
+        el.reelBoxes.forEach((b) => b.style.setProperty('--win', r.color));
+        el.root.classList.add('win');
+        setMsg('GEHEIMWAFFE! Die ' + d.name + ' gehört jetzt dir. Hol sie dir vom Tisch!', 'win');
+        SR.sound.jackpot();
+      } else if (out.type === 'skin') {
         const d = DEFS[out.index];
         api.unlock(d.id, out.skin.id);
         const r = SR.RARITY[out.skin.rarity];
@@ -332,24 +379,32 @@
         el.prizeRarity.textContent = r.name;
         el.prize.style.setProperty('--rar', r.color);
         el.prizeName.textContent = out.skin.name;
-        el.prizeWeapon.textContent = 'Neuer Skin für ' + d.name;
+        el.prizeWeapon.textContent = (out.secret ? 'Geheim-Skin für ' : 'Neuer Skin für ') + d.name;
         el.prizeEquip.hidden = false;
         el.prizeEquip.textContent = 'Jetzt ausrüsten';
         el.prizeEquip.disabled = false;
         el.prize.hidden = false;
         el.reelBoxes.forEach((b) => b.style.setProperty('--win', r.color));
         el.root.classList.add('win');
-        setMsg('Drei Mal ' + d.short + '! Du hast einen ' + r.name.toLowerCase() + 'en Skin gewonnen.', 'win');
+        if (out.secret) {
+          setMsg(
+            'Drei Geheim-Symbole! Geheim-Skin „' + out.skin.name + '“ für die ' + d.name + (api.ownsWeapon(d.id) ? '.' : ' – jetzt fehlt dir nur noch die Waffe.'),
+            'win'
+          );
+        } else {
+          setMsg('Drei Mal ' + d.short + '! Du hast einen ' + r.name.toLowerCase() + 'en Skin gewonnen.', 'win');
+        }
         if (out.skin.rarity >= 2) SR.sound.jackpot();
         else SR.sound.win();
       } else if (out.type === 'money') {
         api.earn(out.amount);
         el.reelBoxes.forEach((b) => b.style.setProperty('--win', '#e6ae45'));
         el.root.classList.add('win');
-        setMsg(
-          out.complete ? 'Du hast schon alle Skins! Dafür gibt es ' + out.amount + ' Taler.' : 'Drei Taler! Du bekommst ' + out.amount + ' Taler.',
-          'win'
-        );
+        let text = 'Drei Taler! Du bekommst ' + out.amount + ' Taler.';
+        if (out.complete) text = 'Du hast schon alle Skins! Dafür gibt es ' + out.amount + ' Taler.';
+        if (out.reason === 'secretWeapon') text = 'Drei Geheim-Symbole! Die Phantom-X hast du schon, dafür gibt es ' + out.amount + ' Taler.';
+        if (out.reason === 'secretSkin') text = 'Drei Geheim-Symbole! Diesen Geheim-Skin hast du schon, dafür gibt es ' + out.amount + ' Taler.';
+        setMsg(text, 'win');
         SR.sound.coins();
       } else {
         setMsg('Leider nichts. Versuch es noch einmal!', '');
@@ -362,8 +417,9 @@
       let owned = 0;
       const rows = DEFS.map((d, i) => {
         const eq = api.equipped(d.id);
+        const hasWeapon = !d.secret || api.ownsWeapon(d.id);
         const tiles = [{ id: 'standard', name: 'Standard', rarity: -1 }].concat(SR.skinList(d.id)).map((s) => {
-          const has = s.id === 'standard' || api.owns(d.id, s.id);
+          const has = s.id === 'standard' ? hasWeapon : api.owns(d.id, s.id);
           if (has && s.id !== 'standard') owned++;
           const rar = s.rarity >= 0 ? SR.RARITY[s.rarity] : null;
           const active = eq === s.id;
@@ -377,7 +433,8 @@
             '</button>'
           );
         });
-        return '<div class="wrow"><h4>' + d.name + '</h4><div class="tiles">' + tiles.join('') + '</div></div>';
+        const title = d.secret ? (hasWeapon ? 'Geheimwaffe · ' + d.name : '??? · Geheimwaffe (0,99 % pro Dreh)') : d.name;
+        return '<div class="wrow' + (d.secret ? ' secret' : '') + '"><h4>' + title + '</h4><div class="tiles">' + tiles.join('') + '</div></div>';
       });
       el.grid.innerHTML = rows.join('');
       el.count.textContent = owned + '/' + SR.SKIN_TOTAL;

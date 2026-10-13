@@ -106,6 +106,15 @@
       this.tone(t, { freq: s.thump, freqEnd: 32, decay: 0.2, gain: s.gain * 0.85 });
     }
 
+    // Energiegewehr: hoher Pfeifton, der schnell abfällt
+    laser() {
+      if (!this.ready) return;
+      const t = this.ctx.currentTime + 0.003;
+      this.tone(t, { type: 'sawtooth', freq: 2400, freqEnd: 260, decay: 0.15, gain: 0.08 });
+      this.tone(t, { type: 'sine', freq: 1100, freqEnd: 140, decay: 0.22, gain: 0.22 });
+      this.noise(t, { type: 'highpass', freq: 4500, q: 0.6, decay: 0.035, gain: 0.12, echo: 0.15 });
+    }
+
     click(delay, freq, gain) {
       if (!this.ready) return;
       const t = this.ctx.currentTime + (delay || 0);

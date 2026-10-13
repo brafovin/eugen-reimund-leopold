@@ -12,7 +12,7 @@
   const BASE_SENS = 0.0022;
   const REACH = 2.7;
   // Plätze auf dem Tisch, gleichmäßig verteilt
-  const SLOT_X = SR.WEAPON_DEFS.map((d, i, all) => (i - (all.length - 1) / 2) * 0.5);
+  const SLOT_X = SR.WEAPON_DEFS.map((d, i, all) => (i - (all.length - 1) / 2) * 0.45);
 
   const $ = (id) => document.getElementById(id);
   const ui = {
@@ -124,20 +124,20 @@
     outline.visible = false;
     scene.add(outline);
 
-    const label = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.36, 0.09),
-      new THREE.MeshStandardMaterial({ map: SR.tex.label(def.short, { w: 256, h: 64 }), roughness: 0.9 })
-    );
+    const nameTex = SR.tex.label(def.short, { w: 256, h: 64 });
+    // Geheimwaffe: Schild zeigt „? ? ?“, bis man sie am Automaten gewonnen hat
+    const lockedTex = def.secret ? SR.tex.label('? ? ?', { w: 256, h: 64, bg: '#2a1020', fg: '#ff4fa3', border: '#ff4fa3' }) : null;
+    const label = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.09), new THREE.MeshStandardMaterial({ map: nameTex, roughness: 0.9 }));
     label.position.set(SLOT_X[i], table.apronY, table.frontZ - 0.012);
     scene.add(label);
 
     const v = def.build();
     v.group.visible = false;
     weaponRoot.add(v.group);
-    const flash = SR.makeMuzzleFlash(def.pellets ? 0.17 : def.id === 'kr86' || def.id === 'g36' ? 0.13 : 0.085);
+    const flash = SR.makeMuzzleFlash(def.pellets ? 0.17 : def.id === 'kr86' || def.id === 'g36' || def.laser ? 0.13 : 0.085, def.beamColor);
     v.muzzle.add(flash);
 
-    return { def, index: i, table: t, view: v, hitbox, outline, flash, onTable: true, kick: 0, boltT: 1, ejected: true, shots: 0 };
+    return { def, index: i, table: t, view: v, hitbox, outline, flash, label, nameTex, lockedTex, onTable: true, kick: 0, boltT: 1, ejected: true, shots: 0 };
   });
 
   // ---------- Skin-Automat auf dem Platz ----------
@@ -200,13 +200,13 @@
   const isActive = () => state.started && !state.paused && !state.inSlot;
 
   // ---------- Geld (Taler) und Skins ----------
-  // Schaden = Taler: 10 pro Körpertreffer, 60 für den Kopf, 20 Bonus fürs Umwerfen,
-  // alles mal Weitschuss-Bonus (1 + Entfernung / 50 m).
-  const DMG = { body: 10, head: 60, down: 20 };
-  const econ = { money: 200, damage: 0, owned: {}, equipped: {}, usedSlot: false };
+  // Taler pro Treffer: Kopf 50, Körper zufällig 35–45 (kleiner Vogelschrot anteilig).
+  const PAY = { head: 50, bodyMin: 35, bodyMax: 45 };
+  const econ = { money: 200, damage: 0, owned: {}, equipped: {}, weapons: {}, usedSlot: false };
   try {
     const saved = JSON.parse(localStorage.getItem('sr-econ') || 'null');
     if (saved && typeof saved.money === 'number') Object.assign(econ, saved);
+    econ.weapons = econ.weapons || {};
   } catch (e) {
     /* kein Speicher – neues Spiel */
   }
@@ -254,12 +254,34 @@
   }
   weapons.forEach(applyWeaponSkin);
 
-  function damageFor(res, def) {
-    const body = (def.pelletHit || 1) * DMG.body;
-    if (res.type === 'head') return DMG.head + DMG.down;
-    if (res.type === 'bodyDown') return body + DMG.down;
-    return body;
+  // Wie stark ein Körpertreffer für das Umwerfen zählt (Schrot weniger, Phantom-X doppelt)
+  const hitValue = (def) => (def.pelletHit != null ? def.pelletHit : def.bodyHits || 1);
+
+  function payFor(res, def) {
+    if (res.type === 'head') return PAY.head;
+    const body = PAY.bodyMin + Math.floor(Math.random() * (PAY.bodyMax - PAY.bodyMin + 1));
+    return body * Math.min(1, hitValue(def));
   }
+
+  // Geheimwaffe: nur sichtbar und benutzbar, wenn man sie gewonnen hat
+  const ownsWeapon = (wid) => !!econ.weapons[wid];
+  function setWeaponLocked(w, locked) {
+    w.locked = locked;
+    w.onTable = !locked && state.held !== w;
+    w.table.group.visible = w.onTable;
+    w.label.material.map = locked ? w.lockedTex : w.nameTex;
+    w.label.material.needsUpdate = true;
+  }
+  function unlockWeapon(wid) {
+    econ.weapons[wid] = true;
+    saveEcon();
+    const w = weapons.find((x) => x.def.id === wid);
+    if (w) setWeaponLocked(w, false);
+    state.newSecret = true;
+  }
+  weapons.forEach((w) => {
+    if (w.def.secret) setWeaponLocked(w, !ownsWeapon(w.def.id));
+  });
 
   function popEarn(n) {
     ui.earn.textContent = '+' + n.toLocaleString('de-DE');
@@ -443,6 +465,8 @@
     },
     owns,
     unlock,
+    ownsWeapon,
+    unlockWeapon,
     equip: equipSkin,
     equipped: (wid) => econ.equipped[wid] || 'standard',
     icon: weaponIcon,
@@ -464,6 +488,10 @@
     slotUI.hide();
     state.inSlot = false;
     saveEcon();
+    if (state.newSecret) {
+      state.newSecret = false;
+      toast('Die Geheimwaffe Phantom-X liegt jetzt ganz rechts auf dem Tisch!', 6);
+    }
     if (!state.fallback) requestLock();
   }
 
@@ -494,6 +522,13 @@
       ray.set(camera.position, tmpDir);
       const hit = ray.intersectObjects(shootables, false)[0];
       if (hit) handleHit(hit, w, shot);
+      if (d.laser) {
+        // Energiestrahl von der Mündung (ungefähr) bis zum Einschlag
+        const e2 = smooth(state.ads);
+        const from = camera.position.clone().addScaledVector(aimDir, 0.6).addScaledVector(tmpRight, 0.11 * (1 - e2)).addScaledVector(tmpUp, -0.1 * (1 - e2) - 0.03);
+        const to = hit ? hit.point : camera.position.clone().addScaledVector(tmpDir, 400);
+        fx.beam(from, to, d.beamColor);
+      }
     }
     reportShot(shot);
 
@@ -511,7 +546,8 @@
     muzzleLight.intensity = 2.2;
     vmFlashLight.intensity = 2.5;
 
-    SR.sound.shot(d.sound);
+    if (d.laser) SR.sound.laser();
+    else SR.sound.shot(d.sound);
     if (w.view.bolt || w.view.pump) {
       w.boltT = 0;
       w.ejected = false;
@@ -556,9 +592,9 @@
         shot.byTarget.set(t, entry);
       }
       entry.pellets++;
-      const res = t.hit(ud.part, w.def.pelletHit);
+      const res = t.hit(ud.part, hitValue(w.def));
       if (res && (!entry.res || RANK[res.type] >= RANK[entry.res.type])) entry.res = res;
-      if (res) entry.dmg += damageFor(res, w.def) * (1 + t.dist / 50);
+      if (res) entry.dmg += payFor(res, w.def);
     } else {
       fx.impact(h.point, n, ud.surface || 'grass', scale, lite);
       if (ud.surface === 'steel' && !shot.ping) {
@@ -1110,13 +1146,20 @@
     const maxRpm = Math.max.apply(null, SR.WEAPON_DEFS.map((d) => d.rpm));
     const list = $('arsenal');
     SR.WEAPON_DEFS.slice()
-      .sort((a, b) => b.rpm - a.rpm)
+      .sort((a, b) => (a.secret ? 1 : 0) - (b.secret ? 1 : 0) || b.rpm - a.rpm)
       .forEach((d) => {
         const li = document.createElement('li');
-        li.innerHTML =
-          '<span class="n">' + d.name + '</span><span class="k">' + d.kind + '</span>' +
-          '<span class="bar"><i style="width:' + Math.round((d.rpm / maxRpm) * 100) + '%"></i></span>' +
-          '<span class="v">' + d.rpm + '<small> /min</small></span>';
+        if (d.secret) {
+          li.className = 'secret';
+          li.innerHTML =
+            '<span class="n">???</span><span class="k">Geheimwaffe · nur am Skin-Automaten (0,99 %)</span>' +
+            '<span class="bar"><i style="width:0"></i></span><span class="v">?</span>';
+        } else {
+          li.innerHTML =
+            '<span class="n">' + d.name + '</span><span class="k">' + d.kind + '</span>' +
+            '<span class="bar"><i style="width:' + Math.round((d.rpm / maxRpm) * 100) + '%"></i></span>' +
+            '<span class="v">' + d.rpm + '<small> /min</small></span>';
+        }
         list.appendChild(li);
       });
   })();
@@ -1146,6 +1189,7 @@
     slotUI,
     equipSkin,
     weaponIcon,
+    unlockWeapon,
     start() {
       state.started = true;
       state.fallback = true;

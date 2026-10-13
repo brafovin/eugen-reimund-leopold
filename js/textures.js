@@ -437,6 +437,38 @@
       return toTexture(c, [1, 1]);
     },
 
+    // Galaxie: Nebel und Sterne. which = 'map' (Farbe) oder 'glow' (leuchtende Sterne)
+    galaxy(which, seed) {
+      const S = 256;
+      const c = makeCanvas(S, S);
+      const g = c.getContext('2d');
+      const glow = which === 'glow';
+      g.fillStyle = glow ? '#000' : '#0b0820';
+      g.fillRect(0, 0, S, S);
+      softPatches(g, S, rng(seed || 3), 26, glow ? ['rgba(90,40,140,0.35)', 'rgba(30,60,140,0.3)'] : ['rgba(120,40,170,0.6)', 'rgba(40,80,190,0.55)', 'rgba(200,60,150,0.35)'], 30, 90);
+      const r = rng((seed || 3) + 1);
+      for (let i = 0; i < 260; i++) {
+        const big = r() < 0.08;
+        g.fillStyle = 'rgba(255,255,255,' + (0.5 + r() * 0.5) + ')';
+        g.beginPath();
+        g.arc(r() * S, r() * S, big ? 1.6 : 0.7, 0, Math.PI * 2);
+        g.fill();
+      }
+      return toTexture(c, [1, 1]);
+    },
+
+    // Regenbogen-Streifen
+    rainbow() {
+      const S = 256;
+      const c = makeCanvas(S, S);
+      const g = c.getContext('2d');
+      const grd = g.createLinearGradient(0, 0, S, S);
+      ['#ff3b3b', '#ff9a1f', '#ffe14a', '#3bd16f', '#2fa8ff', '#7b5cff', '#ff3b3b'].forEach((col, i, a) => grd.addColorStop(i / (a.length - 1), col));
+      g.fillStyle = grd;
+      g.fillRect(0, 0, S, S);
+      return toTexture(c, [1, 1]);
+    },
+
     soft() {
       const S = 64;
       const c = makeCanvas(S, S);

@@ -10,7 +10,9 @@
     { name: 'Selten', color: '#4f93e6', weight: 30 },
     { name: 'Episch', color: '#b06ae6', weight: 15 },
     { name: 'Legendär', color: '#e6ae45', weight: 5 },
+    { name: 'Geheim', color: '#ff4fa3', weight: 0 }, // nur Geheimwaffe, eigene Chance am Automaten
   ];
+  SR.SECRET_RARITY = 4;
 
   const GOLD = { color: 0xd8ac3a, metalness: 1, roughness: 0.18 };
   const GOLD_DARK = { color: 0x9c7420, metalness: 1, roughness: 0.25 };
@@ -200,6 +202,34 @@
         metalDark: { color: 0x121212, metalness: 0.6, roughness: 0.5 },
       },
     ],
+    // Geheim-Skins: jeder hat am Automaten 0,99 % Chance pro Dreh
+    phantom: [
+      {
+        id: 'galaxie',
+        name: 'Galaxie',
+        rarity: 4,
+        poly: { tex: () => T.galaxy('map', 3), glowTex: () => T.galaxy('glow', 3), glow: 0xffffff, glowIntensity: 1.1, repeat: 2, roughness: 0.3 },
+        polyDark: { color: 0x120a2a, roughness: 0.4, metalness: 0.3 },
+        energy: { color: 0xffb8ff, glow: 0xff4dff, glowIntensity: 2.4 },
+      },
+      {
+        id: 'regenbogen',
+        name: 'Regenbogen',
+        rarity: 4,
+        poly: { tex: () => T.rainbow(), glowTex: () => T.rainbow(), glow: 0xffffff, glowIntensity: 0.45, repeat: 1.5, roughness: 0.25 },
+        polyDark: { color: 0xf4f4f4, roughness: 0.3 },
+        energy: { color: 0xffffff, glow: 0xffffff, glowIntensity: 2.2 },
+      },
+      {
+        id: 'diamant',
+        name: 'Diamant',
+        rarity: 4,
+        poly: { color: 0xdff6ff, metalness: 1, roughness: 0.05 },
+        polyDark: { color: 0x8fd0ff, metalness: 1, roughness: 0.1 },
+        metal: { color: 0xffffff, metalness: 1, roughness: 0.04 },
+        energy: { color: 0xc8fbff, glow: 0x7fe9ff, glowIntensity: 2.8 },
+      },
+    ],
   };
 
   SR.skinList = (weaponId) => SR.SKINS[weaponId] || [];
@@ -257,6 +287,7 @@
       out.polyDS.side = THREE.DoubleSide;
     }
     if (spec.mag) out.mag = makeMat(spec.mag);
+    if (spec.energy) out.energy = makeMat(spec.energy);
     return out;
   }
 
