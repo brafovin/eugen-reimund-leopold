@@ -6,6 +6,8 @@
 
   const BODY_HITS_NEEDED = 6;
   SR.BODY_HITS_NEEDED = BODY_HITS_NEEDED;
+  // Umgefallene Scheiben stehen nach dieser Zeit (Sekunden) von selbst wieder auf.
+  SR.TARGET_RESPAWN = 5 * 60;
 
   // [Richtung in Grad (0 = geradeaus, im Uhrzeigersinn), Entfernung in Metern]
   const LAYOUT = [
@@ -121,6 +123,7 @@
       this.holes = [];
       this.parts = [];
       this.landed = false;
+      this.downFor = 0;
 
       const a = THREE.MathUtils.degToRad(angleDeg);
       const root = (this.root = new THREE.Group());
@@ -196,6 +199,13 @@
     knockDown(impulse) {
       this.state = 'falling';
       this.vel = impulse;
+      this.downFor = 0;
+    }
+
+    // Sekunden, bis die Scheibe von selbst wieder aufsteht (null, wenn sie steht).
+    get secondsUntilUp() {
+      if (this.state !== 'down' && this.state !== 'falling') return null;
+      return Math.max(0, SR.TARGET_RESPAWN - this.downFor);
     }
 
     addHole(hit, radius) {
@@ -232,6 +242,10 @@
 
     update(dt) {
       const REST = Math.PI / 2 - 0.035;
+      if (this.state === 'falling' || this.state === 'down') {
+        this.downFor += dt;
+        if (this.state === 'down' && this.downFor >= SR.TARGET_RESPAWN) this.reset();
+      }
       if (this.state === 'falling') {
         this.vel += (16 * Math.sin(this.angle) + 2.5) * dt;
         this.angle += this.vel * dt;

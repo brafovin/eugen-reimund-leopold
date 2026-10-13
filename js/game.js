@@ -5,6 +5,8 @@
   const V3 = THREE.Vector3;
 
   const EYE = 1.65;
+  const EYE_PRONE = 0.36; // Augenhöhe im Liegen
+  const PRONE_TIME = 0.55; // Sekunden zum Hinlegen/Aufstehen
   const BASE_FOV = 75;
   const VM_FOV = 55;
   const BASE_SENS = 0.0022;
@@ -29,6 +31,9 @@
     sHeads: $('statHeads'),
     sTime: $('statTime'),
     sBest: $('statBest'),
+    sStance: $('statStance'),
+    sRespawn: $('statRespawn'),
+    respawnRow: $('respawnRow'),
     wName: $('wName'),
     wKind: $('wKind'),
     wRpm: $('wRpm'),
@@ -154,6 +159,8 @@
     swayY: 0,
     bobT: 0,
     moving: false,
+    prone: false,
+    stance: 0,
     flashT: 0,
     mouseX: 0.5,
     keys: {},
@@ -207,6 +214,17 @@
     restartAnim(ui.hitmarker, 'show');
   }
 
+  // ---------- Hinlegen ----------
+  // Im Liegen streut die Waffe weniger und wackelt weniger.
+  function proneSteady() {
+    return lerp(1, 0.5, smooth(state.stance));
+  }
+
+  function toggleProne() {
+    state.prone = !state.prone;
+    SR.sound.prone(state.prone);
+  }
+
   // ---------- Waffe nehmen / zurücklegen ----------
   function placeOnTable(w) {
     w.onTable = true;
@@ -250,6 +268,7 @@
   const tmpV = new V3();
 
   function lookAtWeapon() {
+    if (state.prone || state.stance > 0.05) return null; // im Liegen kommt man nicht an den Tisch
     camera.getWorldDirection(tmpDir);
     ray.set(camera.position, tmpDir);
     ray.near = 0;
@@ -267,7 +286,8 @@
     state.lastShot = clock;
 
     const e = smooth(state.ads);
-    const spread = lerp(d.hipSpread, d.adsSpread, e) + state.bloom + (state.moving ? 0.012 * (1 - e) : 0);
+    const steady = proneSteady();
+    const spread = (lerp(d.hipSpread, d.adsSpread, e) + state.bloom + (state.moving ? 0.012 * (1 - e) : 0)) * steady;
     camera.updateMatrixWorld();
     camera.getWorldDirection(tmpDir);
     tmpRight.setFromMatrixColumn(camera.matrixWorld, 0);
@@ -282,8 +302,9 @@
     if (hit) handleHit(hit, w);
 
     state.bloom = Math.min(d.maxBloom, state.bloom + d.bloom);
-    state.recoilPitch += d.recoil * (0.8 + Math.random() * 0.4);
-    state.recoilYaw += (Math.random() - 0.5) * d.recoilYaw * 2;
+    const calm = lerp(1, 0.6, smooth(state.stance));
+    state.recoilPitch += d.recoil * (0.8 + Math.random() * 0.4) * calm;
+    state.recoilYaw += (Math.random() - 0.5) * d.recoilYaw * 2 * calm;
     w.kick = Math.min(1.4, w.kick + 1);
     w.shots++;
 
@@ -419,12 +440,26 @@
     const elapsed = round.done ? round.time : round.start == null ? null : clock - round.start;
     setText(ui.sTime, 'time', fmtTime(elapsed));
     setText(ui.sBest, 'best', fmtTime(best));
+    setText(ui.sStance, 'stance', state.prone ? 'liegend' : 'stehend');
+    let next = null;
+    targets.forEach((t) => {
+      const s = t.secondsUntilUp;
+      if (s != null && (next == null || s < next)) next = s;
+    });
+    ui.respawnRow.hidden = next == null;
+    if (next != null) {
+      const m = Math.floor(Math.ceil(next) / 60);
+      const sec = Math.ceil(next) % 60;
+      setText(ui.sRespawn, 'respawn', m + ':' + (sec < 10 ? '0' : '') + sec);
+    }
 
     // Aufnehmen-Hinweis
     let p = '';
     if (state.looking) {
       p = '<kbd>E</kbd> ' + state.looking.def.name + ' nehmen';
       if (state.held) p += ' <span>· ' + state.held.def.short + ' kommt zurück auf den Tisch</span>';
+    } else if (state.prone && !state.held) {
+      p = 'Mit <kbd>Strg</kbd> aufstehen, dann eine Waffe vom Tisch nehmen';
     } else if (!state.held) {
       p = 'Schau auf eine Waffe auf dem Tisch und drück <kbd>E</kbd>';
     }
@@ -443,7 +478,7 @@
 
     if (w) {
       const d = w.def;
-      const spread = lerp(d.hipSpread, d.adsSpread, e) + state.bloom + (state.moving ? 0.012 : 0);
+      const spread = (lerp(d.hipSpread, d.adsSpread, e) + state.bloom + (state.moving ? 0.012 : 0)) * proneSteady();
       const px = (Math.tan(spread) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * (window.innerHeight / 2);
       const gap = Math.round(clamp(px, 3, 80));
       if (hudCache.gap !== gap) {
@@ -547,9 +582,12 @@
   window.addEventListener('keydown', (e) => {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].indexOf(e.code) >= 0) e.preventDefault();
     if (!isActive()) return;
+    // Strg+Taste soll im Spiel keine Browser-Kürzel auslösen (z. B. Strg+S, Strg+D)
+    if (e.ctrlKey) e.preventDefault();
     state.keys[e.code] = true;
     if (e.repeat) return;
-    if (e.code === 'KeyE') equip(lookAtWeapon());
+    if (e.code === 'ControlLeft' || e.code === 'ControlRight') toggleProne();
+    else if (e.code === 'KeyE') equip(lookAtWeapon());
     else if (e.code === 'KeyQ') putBack();
     else if (e.code === 'KeyR') resetRound();
     else if (e.code === 'Escape' && state.fallback) setPaused(true);
@@ -585,9 +623,10 @@
     const k = state.keys;
     const f = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0);
     const s = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
-    state.moving = !!(f || s);
+    const changing = Math.abs(state.stance - (state.prone ? 1 : 0)) > 0.02;
+    state.moving = !!(f || s) && !changing;
     if (!state.moving) return;
-    const speed = (state.aiming ? 1.2 : 2.4) * dt;
+    const speed = (state.prone ? (state.aiming ? 0.3 : 0.6) : state.aiming ? 1.2 : 2.4) * dt;
     const sin = Math.sin(state.yaw);
     const cos = Math.cos(state.yaw);
     let dx = -sin * f + cos * s;
@@ -640,7 +679,8 @@
     // Schießen (Linksklick gedrückt halten = Feuer in der Kadenz der Waffe)
     state.equipT = Math.min(1, state.equipT + dt / 0.35);
     let burst = 0;
-    while (w && active && state.trigger && state.equipT >= 1 && clock >= state.nextShot && burst < 3) {
+    const stanceChanging = Math.abs(state.stance - (state.prone ? 1 : 0)) > 0.02;
+    while (w && active && state.trigger && !stanceChanging && state.equipT >= 1 && clock >= state.nextShot && burst < 3) {
       fire(w);
       state.nextShot = (clock - state.nextShot > d.interval ? clock : state.nextShot) + d.interval;
       burst++;
@@ -656,12 +696,22 @@
     let swayP = 0;
     let swayY = 0;
     if (scoped) {
-      const amp = d.adsFov / 20;
+      const amp = (d.adsFov / 20) * proneSteady();
       swayP = Math.sin(clock * 1.3) * 0.0005 * amp;
       swayY = Math.sin(clock * 0.9) * 0.0007 * amp;
     }
+    // Hinlegen / Aufstehen (Strg)
+    state.stance = approach(state.stance, state.prone ? 1 : 0, dt / PRONE_TIME);
+    const st = smooth(state.stance);
+    const midway = Math.sin(Math.PI * st); // 1 mitten in der Bewegung
+    state.pos.y = world.padTop + lerp(EYE, EYE_PRONE, st);
     camera.position.copy(state.pos);
-    camera.rotation.set(clamp(state.pitch + state.recoilPitch + swayP, -1.55, 1.55), state.yaw + state.recoilYaw + swayY, 0);
+    camera.position.y -= midway * 0.06;
+    camera.rotation.set(
+      clamp(state.pitch + state.recoilPitch + swayP, -1.55, 1.55),
+      state.yaw + state.recoilYaw + swayY,
+      midway * 0.07
+    );
     camera.updateMatrixWorld();
 
     // Was liegt im Blick?
@@ -677,7 +727,7 @@
       const v = w.view;
       const g = v.group;
       g.visible = !scoped;
-      const bobAmt = state.moving ? 1 - e * 0.85 : 0.2 * (1 - e * 0.9);
+      const bobAmt = (state.moving ? 1 - e * 0.85 : 0.2 * (1 - e * 0.9)) * (state.prone && state.moving ? 1.6 : 1);
       state.bobT += dt * (state.moving ? 8.5 : 1.4);
       const bx = Math.cos(state.bobT * 0.5) * 0.007 * bobAmt;
       const by = -Math.abs(Math.sin(state.bobT * 0.5)) * 0.009 * bobAmt;
@@ -689,10 +739,10 @@
 
       g.position.set(
         lerp(d.hipPos[0], 0, e) + bx + state.swayX * swayK,
-        lerp(d.hipPos[1], -v.sightY, e) + by + state.swayY * swayK - (1 - eq) * 0.25,
+        lerp(d.hipPos[1], -v.sightY, e) + by + state.swayY * swayK - (1 - eq) * 0.25 - midway * 0.14,
         lerp(d.hipPos[2], d.adsZ, e) + w.kick * d.kickBack
       );
-      g.rotation.set(w.kick * d.kickRot - (1 - eq) * 0.9, state.swayX * 2 * swayK, 0);
+      g.rotation.set(w.kick * d.kickRot - (1 - eq) * 0.9 - midway * 0.5, state.swayX * 2 * swayK, 0);
 
       // KR86: Kammerstängel hoch, zurück, vor, runter
       if (v.bolt) {
@@ -799,6 +849,7 @@
     get clock() {
       return clock;
     },
+    toggleProne,
     start() {
       state.started = true;
       state.fallback = true;

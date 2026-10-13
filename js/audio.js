@@ -149,6 +149,14 @@
       this.noise(t, { type: 'lowpass', freq: 380, q: 0.7, decay: 0.3, gain: 0.55 });
     }
 
+    // Rascheln beim Hinlegen (tiefer) und Aufstehen (heller)
+    prone(down) {
+      if (!this.ready) return;
+      const t = this.ctx.currentTime;
+      this.noise(t, { type: 'bandpass', freq: down ? 420 : 650, freqEnd: down ? 220 : 900, q: 1.2, decay: 0.35, gain: 0.25 });
+      this.noise(t + (down ? 0.32 : 0.05), { type: 'lowpass', freq: 260, q: 0.8, decay: 0.15, gain: down ? 0.4 : 0.15 });
+    }
+
     rise() {
       if (!this.ready) return;
       const t = this.ctx.currentTime;

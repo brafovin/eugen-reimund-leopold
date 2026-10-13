@@ -25,7 +25,8 @@ npx http-server -p 8080 .
 | Rechtsklick | zielen (gedrückt halten) |
 | E | Waffe vom Tisch nehmen, die du gerade anschaust (die alte Waffe kommt zurück auf den Tisch) |
 | Q | Waffe zurück auf den Tisch legen |
-| W A S D | auf dem Platz herumgehen |
+| W A S D | auf dem Platz herumgehen (im Liegen: robben) |
+| Strg | hinlegen oder aufstehen (kurz antippen) |
 | Pfeiltasten | drehen (Alternative zur Maus) |
 | R | alle Scheiben wieder aufstellen |
 | Esc | Pause |
@@ -36,7 +37,9 @@ npx http-server -p 8080 .
 - Alle Waffen haben **unendlich Munition**.
 - **Kopftreffer**: Die Scheibe fällt sofort um.
 - **Körpertreffer**: Die Scheibe fällt nach **6 Treffern** um.
+- Umgefallene Scheiben stehen nach **5 Minuten** von selbst wieder auf (Anzeige oben links).
 - Liegen alle zwölf Scheiben, wird die Zeit angezeigt und eine neue Runde beginnt.
+- Im Liegen streut die Waffe nur halb so stark und springt weniger hoch. Waffen nehmen geht nur im Stehen.
 
 ## Die Waffen
 
@@ -47,7 +50,8 @@ npx http-server -p 8080 .
 | G36 | 286 Schuss/min | mittel schnell, Zieloptik mit Leuchtpunkt |
 | KR86 | 52 Schuss/min | schießt am langsamsten, Zielfernrohr, Repetieren nach jedem Schuss |
 
-Die Werte stehen in `js/weapons.js` (`interval` = Sekunden zwischen zwei Schüssen) und lassen sich dort leicht ändern.
+Die Wartezeit bis zum Aufstehen steht in `js/targets.js` (`SR.TARGET_RESPAWN`, in Sekunden).
+Die Waffenwerte stehen in `js/weapons.js` (`interval` = Sekunden zwischen zwei Schüssen) und lassen sich dort leicht ändern.
 
 ## Dateien
 

@@ -33,6 +33,8 @@
         <div><dt>Kopftreffer</dt><dd id="statHeads">0</dd></div>
         <div><dt>Zeit</dt><dd id="statTime">–</dd></div>
         <div><dt>Bestzeit</dt><dd id="statBest">–</dd></div>
+        <div class="wide"><dt>Haltung</dt><dd id="statStance">stehend</dd></div>
+        <div class="wide" id="respawnRow" hidden><dt>Nächste steht auf in</dt><dd id="statRespawn">5:00</dd></div>
       </dl>
     </section>
 
@@ -52,6 +54,7 @@
       <span><kbd>Rechts</kbd> zielen</span>
       <span><kbd>E</kbd> nehmen</span>
       <span><kbd>Q</kbd> ablegen</span>
+      <span><kbd>Strg</kbd> hinlegen</span>
       <span><kbd>R</kbd> aufstellen</span>
       <span><kbd>Esc</kbd> Pause</span>
     </div>
@@ -69,7 +72,7 @@
       <header class="intro">
         <p class="eyebrow">Stand 1 · Freigelände</p>
         <h1>Freiluft-<br>Schießstand</h1>
-        <p class="lede">Vier Waffen liegen auf dem Tisch, zwölf Mannscheiben stehen rundherum im Gelände, zwischen 12 und 70 Metern entfernt. Ein Kopftreffer wirft eine Scheibe sofort um. Am Körper braucht es sechs Treffer.</p>
+        <p class="lede">Vier Waffen liegen auf dem Tisch, zwölf Mannscheiben stehen rundherum im Gelände, zwischen 12 und 70 Metern entfernt. Ein Kopftreffer wirft eine Scheibe sofort um. Am Körper braucht es sechs Treffer. Nach fünf Minuten steht jede Scheibe von selbst wieder auf.</p>
         <button id="startBtn" type="button"><span id="startLabel">Spiel starten</span></button>
         <p class="mobile-note">Dieses Spiel braucht Maus und Tastatur.</p>
         <label class="sens" for="sens">
@@ -88,6 +91,7 @@
             <li><kbd>E</kbd><span>Waffe vom Tisch nehmen oder tauschen</span></li>
             <li><kbd>Q</kbd><span>Waffe zurück auf den Tisch legen</span></li>
             <li><kbd>W A S D</kbd><span>auf dem Platz herumgehen</span></li>
+            <li><kbd>Strg</kbd><span>hinlegen oder aufstehen (kurz antippen). Im Liegen zielst du ruhiger.</span></li>
             <li><kbd>R</kbd><span>alle Scheiben wieder aufstellen</span></li>
             <li><kbd>Esc</kbd><span>Pause</span></li>
           </ul>
