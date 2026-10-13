@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Freiluft-Schießstand</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Saira+Stencil+One&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="stage"></div>
+
+  <div id="hud">
+    <div id="scope" hidden>
+      <div class="lens">
+        <span class="post l"></span><span class="post r"></span><span class="post b"></span><span class="post t"></span>
+        <span class="hair h"></span><span class="hair v"></span>
+        <span class="ring"></span><span class="dot"></span>
+      </div>
+    </div>
+    <div id="crosshair"><span class="t"></span><span class="b"></span><span class="l"></span><span class="r"></span><i></i></div>
+    <div id="hitmarker"><span></span><span></span><span></span><span></span></div>
+    <div id="hitText"></div>
+
+    <section id="board" class="panel" aria-label="Anzeigetafel">
+      <h2>Stand 1</h2>
+      <dl>
+        <div class="big"><dt>Scheiben liegen</dt><dd id="statDown">0/12</dd></div>
+        <div><dt>Schüsse</dt><dd id="statShots">0</dd></div>
+        <div><dt>Treffer</dt><dd id="statHits">0</dd></div>
+        <div><dt>Kopftreffer</dt><dd id="statHeads">0</dd></div>
+        <div><dt>Zeit</dt><dd id="statTime">–</dd></div>
+        <div><dt>Bestzeit</dt><dd id="statBest">–</dd></div>
+      </dl>
+    </section>
+
+    <section id="weaponCard" class="panel empty" aria-label="Waffe in der Hand">
+      <div class="wHead">
+        <span id="wName">Keine Waffe</span>
+        <span class="ammo"><small>Munition</small><b id="wAmmo">–</b></span>
+      </div>
+      <div id="wKind">Die Waffen liegen auf dem Tisch</div>
+      <div class="rate"><div class="track"><div id="wBar"></div></div><span id="wRpm">–</span></div>
+    </section>
+
+    <div id="prompt" hidden></div>
+
+    <div id="keys" aria-hidden="true">
+      <span><kbd>Links</kbd> schießen</span>
+      <span><kbd>Rechts</kbd> zielen</span>
+      <span><kbd>E</kbd> nehmen</span>
+      <span><kbd>Q</kbd> ablegen</span>
+      <span><kbd>R</kbd> aufstellen</span>
+      <span><kbd>Esc</kbd> Pause</span>
+    </div>
+
+    <div id="banner" hidden>
+      <strong id="bannerText"></strong>
+      <span id="bannerSub"></span>
+      <em>Neue Runde startet gleich – oder drück <kbd>R</kbd></em>
+    </div>
+    <div id="toast" hidden></div>
+  </div>
+
+  <div id="overlay">
+    <div class="sheet">
+      <header class="intro">
+        <p class="eyebrow">Stand 1 · Freigelände</p>
+        <h1>Freiluft-<br>Schießstand</h1>
+        <p class="lede">Vier Waffen liegen auf dem Tisch, zwölf Mannscheiben stehen rundherum im Gelände, zwischen 12 und 70 Metern entfernt. Ein Kopftreffer wirft eine Scheibe sofort um. Am Körper braucht es sechs Treffer.</p>
+        <button id="startBtn" type="button"><span id="startLabel">Spiel starten</span></button>
+        <p class="mobile-note">Dieses Spiel braucht Maus und Tastatur.</p>
+        <label class="sens" for="sens">
+          <span>Mausempfindlichkeit <output id="sensOut" for="sens">1,0</output></span>
+          <input id="sens" type="range" min="0.3" max="2.5" step="0.1" value="1">
+        </label>
+      </header>
+
+      <div class="cols">
+        <section aria-labelledby="hControls">
+          <h2 id="hControls">Steuerung</h2>
+          <ul class="controls">
+            <li><kbd>Maus</kbd><span>umsehen und drehen</span></li>
+            <li><kbd>Linksklick</kbd><span>schießen, gedrückt halten für Dauerfeuer</span></li>
+            <li><kbd>Rechtsklick</kbd><span>zielen (gedrückt halten)</span></li>
+            <li><kbd>E</kbd><span>Waffe vom Tisch nehmen oder tauschen</span></li>
+            <li><kbd>Q</kbd><span>Waffe zurück auf den Tisch legen</span></li>
+            <li><kbd>W A S D</kbd><span>auf dem Platz herumgehen</span></li>
+            <li><kbd>R</kbd><span>alle Scheiben wieder aufstellen</span></li>
+            <li><kbd>Esc</kbd><span>Pause</span></li>
+          </ul>
+        </section>
+        <section aria-labelledby="hWeapons">
+          <h2 id="hWeapons">Kadenz der Waffen</h2>
+          <ul class="arsenal" id="arsenal"></ul>
+          <p class="note">Alle Waffen haben unendlich Munition. Du kannst immer nur eine Waffe in der Hand halten.</p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+  <script>window.THREE || document.write('<script src="vendor/three.min.js"><\/script>');</script>
+  <script src="js/textures.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/weapons.js"></script>
+  <script src="js/targets.js"></script>
+  <script src="js/effects.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
