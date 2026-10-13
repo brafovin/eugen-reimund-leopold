@@ -29,17 +29,6 @@
       lensDark: new THREE.MeshStandardMaterial({ color: 0x0b1018, metalness: 1, roughness: 0.1 }),
       rubber: new THREE.MeshStandardMaterial({ color: 0x121212, roughness: 0.95 }),
     };
-    // Feine Oberflächenstruktur: gebürstetes Metall und genarbter Kunststoff
-    const brushed = SR.tex.grain(3, true);
-    const pebble = SR.tex.grain(8, false);
-    ['steel', 'steelDark', 'steelBright'].forEach((k) => {
-      M[k].bumpMap = brushed;
-      M[k].bumpScale = 0.5;
-    });
-    ['polymer', 'polymerDark', 'polymerDS', 'rubber'].forEach((k) => {
-      M[k].bumpMap = pebble;
-      M[k].bumpScale = 0.9;
-    });
     // Rolle jedes Materials – Skins ersetzen Materialien anhand dieser Rolle (siehe skins.js)
     const ROLES = {
       steel: 'metal',
