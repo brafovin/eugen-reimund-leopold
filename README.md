@@ -1,8 +1,9 @@
 # Freiluft-Schießstand
 
 Ein 3D-Schießstand-Spiel für den Browser (Three.js). Du stehst auf einem Betonplatz auf einem offenen
-Gelände, vor dir liegt ein Tisch mit sechs Waffen (plus einer Geheimwaffe, die man erst gewinnen muss), rundherum stehen zwölf Mannscheiben in 12 bis 70 Metern
-Entfernung.
+Gelände. Vor dir liegt ein Tisch mit Waffen (plus einer Geheimwaffe, die man erst gewinnen muss), rechts hängt eine
+Waffenwand mit weiteren Waffen. Rundherum stehen zwölf Mannscheiben in 12 bis 70 Metern Entfernung, einige fahren auf
+Schienen hin und her. Auf Feldwegen laufen Gegner mit Waffen und schießen auf dich.
 
 ## Spielen
 
@@ -21,10 +22,10 @@ npx http-server -p 8080 .
 | Taste | Aktion |
 | --- | --- |
 | Maus | umsehen und drehen |
-| Linksklick | schießen (gedrückt halten = Dauerfeuer in der Kadenz der Waffe) |
+| Linksklick | schießen (gedrückt halten = Dauerfeuer in der Kadenz der Waffe). **Bogen:** gedrückt halten = spannen, loslassen = schießen |
 | Rechtsklick | zielen (gedrückt halten) |
-| E | Waffe vom Tisch nehmen, die du gerade anschaust (die alte Waffe kommt zurück auf den Tisch), oder den Skin-Automaten benutzen |
-| Q | Waffe zurück auf den Tisch legen |
+| E | Waffe vom Tisch oder von der Waffenwand nehmen, die du gerade anschaust (die alte Waffe kommt zurück), oder den Skin-Automaten benutzen |
+| Q | Waffe zurücklegen (an ihren Platz auf Tisch oder Wand) |
 | W A S D | auf dem Platz herumgehen (im Liegen: robben) |
 | Strg | hinlegen oder aufstehen (kurz antippen) |
 | Pfeiltasten | drehen (Alternative zur Maus) |
@@ -41,13 +42,35 @@ npx http-server -p 8080 .
 - Liegen alle zwölf Scheiben, wird die Zeit angezeigt und eine neue Runde beginnt.
 - Im Liegen streut die Waffe nur halb so stark und springt weniger hoch. Waffen nehmen geht nur im Stehen.
 
+## Gegner, Lebensleiste und bewegliche Ziele
+
+- **Lebensleiste** unten in der Mitte (100 Leben). Wirst du getroffen, blitzt der Bildschirmrand rot auf, ein roter Pfeil zeigt,
+  woher geschossen wurde. Nach 6 Sekunden ohne Treffer wachsen die Leben langsam nach. Bei 0 fällst du um und stehst nach
+  ein paar Sekunden wieder am Schießstand auf (die Gegner sind dann zurückgesetzt, dein Geld bleibt).
+- **Gegner** sind Menschen mit den Waffen aus dem Spiel (nie mit der Geheimwaffe). Sie laufen auf vier Feldwegen
+  (Waldweg, Handelsroute, Feldweg, Höhenpfad), entdecken dich in Reichweite ihrer Waffe, zielen und schießen. Über
+  getroffenen Gegnern erscheint eine Lebensleiste.
+  - **Gangster (C96)**: schnelle Salven, mittlere Reichweite
+  - **Cowboy (Revolver)**: langsame, kräftige Schüsse
+  - **Soldat (G36)**: Salven, große Reichweite
+  - **Scharfschütze (KR86)**: ein roter Laser warnt kurz vor dem Schuss, bewegen hilft
+  - **Jäger (Birdshot)**: Schrotgarbe auf mittlere Entfernung
+  - **Holzfäller (SG-21 Treewhacker)**: rennt auf dich zu und schießt aus der Nähe
+  - **Bogenschütze**: Pfeile mit sichtbarer Flugbahn, man kann ausweichen
+  - **Bandit (UZ-9)**: rennt heran, lange Feuerstöße
+  - **Rancher (Büffeljäger)**: genaue Einzelschüsse aus großer Entfernung
+- Zu Beginn eines Kampfes zielen Gegner schlecht, und wer läuft oder liegt, wird seltener getroffen.
+- **Taler für Gegner**: wie bei Scheiben (Körper 35 bis 45, Kopf 50, Phantom-X Kopf 100) plus 100 Taler für jeden besiegten
+  Gegner. Besiegte Gegner stehen nach etwa 45 Sekunden wieder auf dem Weg.
+- **Bewegliche Ziele**: sechs der zwölf Scheiben fahren auf Schienen hin und her.
+
 ## Taler und Skin-Automat
 
 Jeder Treffer bringt **Taler** (oben rechts):
 
 | Treffer | Taler |
 | --- | --- |
-| Kopftreffer | 50 |
+| Kopftreffer | 50 (mit der Phantom-X: 100) |
 | Körpertreffer | zufällig 35 bis 45 (feiner Vogelschrot der Birdshot zählt anteilig, etwa 3 Kugeln = 1 Treffer) |
 
 Hinten links auf dem Platz steht der **Skin-Automat**. Hinschauen und **E** drücken. Ein Dreh kostet 100 Taler.
@@ -75,6 +98,7 @@ Ein Energiegewehr, das es **nur am Skin-Automaten** gibt. Bis du es gewonnen has
 Danach liegt es ganz rechts auf dem Tisch.
 
 - 600 Schuss/min, schießt einen leuchtenden Energiestrahl, keine Streuung beim Zielen
+- ein Kopfschuss bringt **100 Taler** (statt 50)
 - jeder Körpertreffer zählt doppelt: 3 Treffer werfen eine Scheibe um
 - Holo-Visier mit Leuchtpunkt
 - drei Geheim-Skins: Galaxie, Regenbogen, Diamant (je 0,99 % pro Dreh)
@@ -95,7 +119,7 @@ Die Skins stehen in `js/skins.js`, der Automat in `js/slot.js`.
 
 | Waffe | Kadenz | Besonderheit |
 | --- | --- | --- |
-| Mauser C96 | 923 Schuss/min | schießt am schnellsten |
+| Mauser C96 | 545 Schuss/min | schnelle Pistole, aber langsamer als UZ-9 und Sägewerk MG |
 | Double-Action-Revolver | 400 Schuss/min | langsamer als die C96, schneller als das G36; Trommel dreht sich |
 | G36 | 286 Schuss/min | mittel schnell, Zieloptik mit Leuchtpunkt |
 | KR86 | 52 Schuss/min | schießt am langsamsten, Zielfernrohr, Repetieren nach jedem Schuss |

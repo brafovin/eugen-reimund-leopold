@@ -609,14 +609,14 @@
     };
   }
 
-  // Kadenz: C96 am schnellsten, dann Revolver, dann G36, KR86 am langsamsten.
+  // Kadenz: C96 (545/min), dann Revolver, dann G36, KR86 am langsamsten.
   SR.WEAPON_DEFS = [
     {
       id: 'c96',
       name: 'Mauser C96',
       short: 'C96',
       kind: 'Selbstladepistole',
-      interval: 0.065,
+      interval: 0.11,
       hipPos: [0.15, -0.15, -0.46],
       adsZ: -0.42,
       adsFov: 58,

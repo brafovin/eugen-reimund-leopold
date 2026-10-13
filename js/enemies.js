@@ -8,12 +8,12 @@
   // Werte je Waffe. dmg = Schaden am Spieler pro Treffer (bei Schrot pro Kugel), sigma = Zielfehler (Bogenmaß, 1 sigma),
   // range = ab hier greift der Gegner an, react = Reaktionszeit, aimTime = Waffe heben, burst = Schüsse pro Salve.
   const TYPES = {
-    c96: { outfit: 'gangster', hp: 90, speed: 1.5, range: 42, react: 0.7, aimTime: 0.35, interval: 0.11, burst: [3, 4], pause: [1.3, 2.2], dmg: 2.8, sigma: 0.024, lag: 0.25 },
+    c96: { outfit: 'gangster', hp: 90, speed: 1.5, range: 42, react: 0.7, aimTime: 0.35, interval: 0.14, burst: [3, 4], pause: [1.3, 2.2], dmg: 2.8, sigma: 0.024, lag: 0.25 },
     revolver: { outfit: 'cowboy', hp: 100, speed: 1.4, range: 48, react: 0.8, aimTime: 0.4, interval: 0.95, burst: [1, 2], pause: [1.0, 1.7], dmg: 8, sigma: 0.013, lag: 0.3 },
     g36: { outfit: 'soldier', hp: 110, speed: 1.5, range: 78, react: 0.7, aimTime: 0.45, interval: 0.14, burst: [3, 4], pause: [1.2, 2.0], dmg: 3.0, sigma: 0.012, lag: 0.3 },
     kr86: { outfit: 'sniper', hp: 70, speed: 1.0, range: 118, react: 1.0, aimTime: 0.6, interval: 1, burst: [1, 1], pause: [2.4, 3.4], dmg: 30, sigma: 0.003, telegraph: 1.0, lag: 0 },
     birdshot: { outfit: 'hunter', hp: 100, speed: 1.3, range: 52, react: 0.9, aimTime: 0.5, interval: 1, burst: [1, 1], pause: [1.6, 2.4], dmg: 2.4, pellets: 10, spread: 0.04, sigma: 0.014, lag: 0.3 },
-    sg21: { outfit: 'lumberjack', hp: 135, speed: 1.4, run: 3.3, range: 24, react: 0.6, aimTime: 0.4, interval: 1, burst: [1, 1], pause: [1.1, 1.6], dmg: 4, pellets: 9, spread: 0.065, sigma: 0.02, charge: true, stop: 8, lag: 0.2 },
+    sg21: { outfit: 'lumberjack', hp: 135, speed: 1.4, run: 3.3, range: 24, react: 0.6, aimTime: 0.4, interval: 1, burst: [1, 1], pause: [1.3, 1.9], dmg: 2.8, pellets: 9, spread: 0.075, sigma: 0.02, charge: true, stop: 10, lag: 0.2 },
     bogen: { outfit: 'archer', hp: 85, speed: 1.4, range: 62, react: 0.9, aimTime: 0.4, interval: 1, burst: [1, 1], pause: [1.1, 1.8], dmg: 18, arrow: { speed: 56, draw: 0.85 }, lag: 0 },
     uz9: { outfit: 'bandit', hp: 80, speed: 1.6, run: 3.0, range: 36, react: 0.6, aimTime: 0.3, interval: 0.075, burst: [5, 8], pause: [1.4, 2.2], dmg: 2.0, sigma: 0.03, charge: true, stop: 13, lag: 0.25 },
     lever: { outfit: 'rancher', hp: 105, speed: 1.3, range: 72, react: 0.9, aimTime: 0.5, interval: 1, burst: [1, 1], pause: [1.3, 2.0], dmg: 12, sigma: 0.006, lag: 0.45 },

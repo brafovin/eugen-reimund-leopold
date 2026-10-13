@@ -148,7 +148,7 @@
       g.position.set(
         WALL.x - 0.03 - bb.max.x,
         (pistol ? WALL.pistolY : WALL.rowY) + world.padTop - (bb.min.y + bb.max.y) / 2,
-        WALL.slotZ[slot] - (bb.min.z + bb.max.z) / 2
+        WALL.slotZFor(slot, wallDefs.length) - (bb.min.z + bb.max.z) / 2
       );
     } else {
       g.position.set(SLOT_X[w.index] - (bb.min.x + bb.max.x) / 2, table.topY - bb.min.y, table.z - (bb.min.z + bb.max.z) / 2);
@@ -189,7 +189,7 @@
     if (def.wall) {
       // Schild am Regalbrett unter der Waffe
       label.scale.set(0.9, 0.9, 1);
-      label.position.set(WALL.x - 0.182, world.padTop + 0.56, WALL.slotZ[wallDefs.indexOf(def)]);
+      label.position.set(WALL.x - 0.182, world.padTop + 0.56, WALL.slotZFor(wallDefs.indexOf(def), wallDefs.length));
       label.rotation.y = -Math.PI / 2;
     } else {
       label.position.set(SLOT_X[i], table.apronY, table.frontZ - 0.012);

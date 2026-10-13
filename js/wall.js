@@ -12,6 +12,13 @@
     z1: WALL.z1,
     // Mittelpunkt-z jedes Platzes (Reihenfolge wie die Wandwaffen in SR.WEAPON_DEFS); der Bogen braucht mehr Platz
     slotZ: [-0.5, 0.38, 0.98, 1.6, 2.22, 2.84],
+    // z-Mitte für Platz i von n Wandwaffen (bei genau 6 die handgesetzten Werte, sonst gleichmäßig verteilt)
+    slotZFor(i, n) {
+      if (n === 6) return this.slotZ[i];
+      const a = this.z0 + 0.5;
+      const b = this.z1 - 0.5;
+      return n <= 1 ? (a + b) / 2 : a + ((b - a) * i) / (n - 1);
+    },
     rowY: 1.42, // Höhe der Mitte aufgehängter Langwaffen
     pistolY: 1.32,
   };
@@ -27,7 +34,7 @@
     const woodM = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.82 });
     const darkM = new THREE.MeshStandardMaterial({ map: darkTex, roughness: 0.8 });
     const steelM = new THREE.MeshStandardMaterial({ color: 0x3a3f3a, roughness: 0.5, metalness: 0.7 });
-    const feltM = new THREE.MeshStandardMaterial({ color: 0x2c3326, roughness: 1 });
+    const feltM = new THREE.MeshStandardMaterial({ color: 0x55603f, roughness: 1 });
 
     function add(geo, mat, x, y, z, rot) {
       const m = new THREE.Mesh(geo, mat);
@@ -72,6 +79,11 @@
     sign.position.set(WALL.x - 0.02, floorY + 2.12, zc);
     sign.rotation.y = -Math.PI / 2;
     g.add(sign);
+
+    // Lampe unter dem Dach, damit die Waffen im Dachschatten gut zu sehen sind
+    const lamp = new THREE.PointLight(0xffe3b8, 1.6, 8, 2);
+    lamp.position.set(WALL.x - 0.45, floorY + 2.25, zc);
+    g.add(lamp);
 
     return { group: g, parts, wall: SR.WALL, floorY };
   };
