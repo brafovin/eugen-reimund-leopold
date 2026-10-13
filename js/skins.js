@@ -202,6 +202,43 @@
         metalDark: { color: 0x121212, metalness: 0.6, roughness: 0.5 },
       },
     ],
+    bogen: [
+      {
+        id: 'eibe',
+        name: 'Eibenholz',
+        rarity: 0,
+        wood: { tex: () => T.wood([214, 164, 104], 61, 128), repeat: 2, roughness: 0.45 },
+        metal: { color: 0xa8843a, metalness: 1, roughness: 0.3 },
+        leather: { color: 0x6b4a2a, roughness: 0.8 },
+      },
+      {
+        id: 'jagdtarn',
+        name: 'Jagdtarn',
+        rarity: 1,
+        wood: { tex: () => T.camo(['#4b5a33', '#2c3a22', '#7a7448', '#1f2418'], 15, { count: 80, minR: 6, maxR: 20 }), repeat: 2, roughness: 0.7 },
+        metal: { color: 0x2c3328, metalness: 0.7, roughness: 0.45 },
+        leather: { color: 0x2c3a22, roughness: 0.85 },
+      },
+      {
+        id: 'drachenbein',
+        name: 'Drachenknochen',
+        rarity: 2,
+        wood: { color: 0xeee6d0, roughness: 0.35 },
+        metal: { color: 0x3a0d0d, metalness: 0.9, roughness: 0.3, glow: 0x7a1010, glowIntensity: 0.9 },
+        leather: { color: 0x6b1a1a, roughness: 0.7 },
+        fletch: { color: 0xc42b1e, roughness: 0.8 },
+      },
+      {
+        id: 'armbrust',
+        name: 'Goldene Armbrust',
+        rarity: 3,
+        variant: 'crossbow',
+        wood: { tex: () => T.wood([58, 36, 28], 33, 128), repeat: 2, roughness: 0.3 },
+        metal: GOLD,
+        metalDark: GOLD_DARK,
+        leather: { color: 0x5a1414, roughness: 0.6 },
+      },
+    ],
     // Geheim-Skins: jeder hat am Automaten 0,99 % Chance pro Dreh
     phantom: [
       {
@@ -287,7 +324,9 @@
       out.polyDS.side = THREE.DoubleSide;
     }
     if (spec.mag) out.mag = makeMat(spec.mag);
-    if (spec.energy) out.energy = makeMat(spec.energy);
+    ['energy', 'leather', 'fletch', 'string', 'rubber'].forEach((k) => {
+      if (spec[k]) out[k] = makeMat(spec[k]);
+    });
     return out;
   }
 
@@ -302,7 +341,9 @@
   };
 
   // Skin auf ein Waffenmodell anwenden ('standard' oder unbekannt = Originalmaterialien)
-  SR.applySkin = function (group, weaponId, skinId) {
+  // api (optional) ist das Ergebnis von build(): Hat es setVariant, wählt der Skin die Bauform (z. B. Bogen oder Armbrust).
+  // Liefert den Namen der Bauform oder null.
+  SR.applySkin = function (group, weaponId, skinId, api) {
     const mats = skinId && skinId !== 'standard' ? SR.getSkinMats(weaponId, skinId) : null;
     group.traverse((o) => {
       if (!o.isMesh) return;
@@ -311,5 +352,25 @@
       const role = base.userData && base.userData.role;
       o.material = (mats && role && mats[role]) || base;
     });
+    let variant = null;
+    if (api && api.setVariant) {
+      const spec = skinId && skinId !== 'standard' ? SR.findSkin(weaponId, skinId) : null;
+      variant = (spec && spec.variant) || (api.variants && api.variants[0]) || null;
+      api.setVariant(variant);
+    }
+    return variant;
+  };
+
+  // Umgebungsquader nur der sichtbaren Teile (ausgeblendete Bauformen zählen nicht mit)
+  SR.visibleBox = function (obj) {
+    const box = new THREE.Box3();
+    obj.updateWorldMatrix(true, true);
+    obj.traverse((o) => {
+      if (!o.isMesh || !o.geometry) return;
+      for (let p = o; p && p !== obj; p = p.parent) if (p.visible === false) return;
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
+    });
+    return box;
   };
 })();

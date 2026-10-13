@@ -11,8 +11,17 @@
   const VM_FOV = 55;
   const BASE_SENS = 0.0022;
   const REACH = 2.7;
-  // Plätze auf dem Tisch, gleichmäßig verteilt
-  const SLOT_X = SR.WEAPON_DEFS.map((d, i, all) => (i - (all.length - 1) / 2) * 0.45);
+  // Plätze auf dem Tisch (nur Tischwaffen), gleichmäßig verteilt. Wandwaffen hängen an der Waffenwand.
+  const TABLE_DEFS = SR.WEAPON_DEFS.filter((d) => !d.wall);
+  const SLOT_X = SR.WEAPON_DEFS.map((d) => (TABLE_DEFS.indexOf(d) - (TABLE_DEFS.length - 1) / 2) * 0.45);
+  SR.WEAPON_DEFS.forEach((d) => {
+    d.rpm = Math.round(60 / d.interval);
+  });
+  // Schaden gegen Gegner (pro Treffer, bei Schrot pro Kugel); neue Waffen bringen ihren Wert selbst mit
+  const HURT_DEFAULT = { c96: 16, revolver: 42, g36: 24, kr86: 92, birdshot: 11, sg21: 17, phantom: 34 };
+  SR.WEAPON_DEFS.forEach((d) => {
+    if (d.dmg == null) d.dmg = HURT_DEFAULT[d.id] || 20;
+  });
 
   const $ = (id) => document.getElementById(id);
   const ui = {
@@ -50,6 +59,17 @@
     dmgTotal: $('damageTotal'),
     earn: $('earn'),
     wSkin: $('wSkin'),
+    hurt: $('hurt'),
+    hitDir: $('hitDir'),
+    hpBar: $('hpBar'),
+    hpNum: $('hpNum'),
+    vitals: $('vitals'),
+    death: $('death'),
+    deathSub: $('deathSub'),
+    kills: $('statKills'),
+    enemyBars: $('enemyBars'),
+    drawBar: $('drawBar'),
+    drawFill: $('drawFill'),
   };
 
   // ---------- Renderer & Szenen ----------
@@ -88,18 +108,65 @@
   const fx = SR.createEffects(scene, vmScene);
   const targets = SR.createTargets(scene);
 
-  const shootables = world.shootables.slice();
-  targets.forEach((t) => shootables.push(...t.parts));
+  // Statische Hindernisse (Boden, Tisch, Scheiben, Automat, Wand): Sichtlinien und Gegner-Kugeln prüfen nur gegen diese.
+  const staticShoot = world.shootables.slice();
+  targets.forEach((t) => staticShoot.push(...t.parts));
+  const wall = SR.buildWall(scene, world.padTop);
+  wall.parts.forEach((m) => staticShoot.push(m));
+  SR.buildPaths(scene);
+  // Alles Treffbare inklusive der lebenden Gegner (wird neu gebaut, wenn sich die Gegner-Liste ändert)
+  let shootables = staticShoot;
+  let shootVersion = -1;
 
-  // ---------- Waffen auf dem Tisch ----------
+  // ---------- Waffen auf Tisch und Wand ----------
   const table = world.table;
   const highlightMat = new THREE.LineBasicMaterial({ color: 0xe6ae45, transparent: true, opacity: 0.9 });
+  const WALL = SR.WALL;
+  const wallDefs = SR.WEAPON_DEFS.filter((d) => d.wall);
+
+  // Drehung beim Aufhängen: Langwaffen stehen mit dem Lauf nach oben, Pistolen liegen waagerecht, die Armbrust mit senkrechten Wurfarmen
+  function wallRotation(w) {
+    const api = w.table;
+    if (w.variant === 'crossbow') return [0, 0, Math.PI / 2];
+    if (api.stance === 'bow') return [0, 0, 0];
+    const stance = api.stance || (SR.HOLD[w.def.id] && SR.HOLD[w.def.id].stance);
+    return stance === 'pistol' ? [0, 0, 0] : [Math.PI / 2, 0, 0];
+  }
+
+  // Stellt die Waffe an ihren Platz (Tisch oder Wand) und passt Auswahlkasten und Umriss an.
+  function layoutHome(w) {
+    const g = w.table.group;
+    g.position.set(0, 0, 0);
+    const wallRow = !!w.def.wall;
+    if (wallRow) g.rotation.set(...wallRotation(w));
+    else g.rotation.set(0, 0, Math.PI / 2); // auf die Seite gelegt
+    g.updateMatrixWorld(true);
+    const bb = SR.visibleBox(g);
+    if (wallRow) {
+      const slot = wallDefs.indexOf(w.def);
+      const pistol = wallRotation(w)[0] === 0 && w.variant !== 'crossbow' && w.table.stance !== 'bow';
+      g.position.set(
+        WALL.x - 0.03 - bb.max.x,
+        (pistol ? WALL.pistolY : WALL.rowY) + world.padTop - (bb.min.y + bb.max.y) / 2,
+        WALL.slotZ[slot] - (bb.min.z + bb.max.z) / 2
+      );
+    } else {
+      g.position.set(SLOT_X[w.index] - (bb.min.x + bb.max.x) / 2, table.topY - bb.min.y, table.z - (bb.min.z + bb.max.z) / 2);
+    }
+    g.updateMatrixWorld(true);
+    const box = SR.visibleBox(g);
+    const size = box.getSize(new V3());
+    const center = box.getCenter(new V3());
+    w.hitbox.geometry.dispose();
+    w.hitbox.geometry = new THREE.BoxGeometry(Math.max(size.x, 0.12) + 0.06, Math.max(size.y, 0.12) + 0.08, Math.max(size.z, 0.12) + 0.06);
+    w.hitbox.position.copy(center);
+    w.outline.geometry.dispose();
+    w.outline.geometry = new THREE.EdgesGeometry(w.hitbox.geometry);
+    w.outline.position.copy(center);
+  }
+
   const weapons = SR.WEAPON_DEFS.map((def, i) => {
     const t = def.build();
-    t.group.rotation.set(0, 0, Math.PI / 2); // auf die Seite gelegt
-    t.group.updateMatrixWorld(true);
-    const bb = new THREE.Box3().setFromObject(t.group);
-    t.group.position.set(SLOT_X[i] - (bb.min.x + bb.max.x) / 2, table.topY - bb.min.y, table.z - (bb.min.z + bb.max.z) / 2);
     t.group.traverse((o) => {
       if (o.isMesh) {
         o.castShadow = true;
@@ -107,20 +174,11 @@
       }
     });
     scene.add(t.group);
-    t.group.updateMatrixWorld(true);
 
-    const box = new THREE.Box3().setFromObject(t.group);
-    const size = box.getSize(new V3());
-    const center = box.getCenter(new V3());
-    const hitbox = new THREE.Mesh(
-      new THREE.BoxGeometry(Math.max(size.x, 0.12) + 0.06, size.y + 0.12, size.z + 0.06),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
-    hitbox.position.copy(center);
+    const hitbox = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ visible: false }));
     hitbox.userData.slot = i;
     scene.add(hitbox);
     const outline = new THREE.LineSegments(new THREE.EdgesGeometry(hitbox.geometry), highlightMat);
-    outline.position.copy(center);
     outline.visible = false;
     scene.add(outline);
 
@@ -128,21 +186,29 @@
     // Geheimwaffe: Schild zeigt „? ? ?“, bis man sie am Automaten gewonnen hat
     const lockedTex = def.secret ? SR.tex.label('? ? ?', { w: 256, h: 64, bg: '#2a1020', fg: '#ff4fa3', border: '#ff4fa3' }) : null;
     const label = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.09), new THREE.MeshStandardMaterial({ map: nameTex, roughness: 0.9 }));
-    label.position.set(SLOT_X[i], table.apronY, table.frontZ - 0.012);
+    if (def.wall) {
+      // Schild am Regalbrett unter der Waffe
+      label.scale.set(0.9, 0.9, 1);
+      label.position.set(WALL.x - 0.182, world.padTop + 0.56, WALL.slotZ[wallDefs.indexOf(def)]);
+      label.rotation.y = -Math.PI / 2;
+    } else {
+      label.position.set(SLOT_X[i], table.apronY, table.frontZ - 0.012);
+    }
     scene.add(label);
 
     const v = def.build();
     v.group.visible = false;
     weaponRoot.add(v.group);
     const flash = SR.makeMuzzleFlash(def.pellets ? 0.17 : def.id === 'kr86' || def.id === 'g36' || def.laser ? 0.13 : 0.085, def.beamColor);
-    v.muzzle.add(flash);
+    if (def.type !== 'bow') v.muzzle.add(flash);
 
-    return { def, index: i, table: t, view: v, hitbox, outline, flash, label, nameTex, lockedTex, onTable: true, kick: 0, boltT: 1, ejected: true, shots: 0 };
+    return { def, index: i, table: t, view: v, hitbox, outline, flash, label, nameTex, lockedTex, variant: null, onTable: true, kick: 0, boltT: 1, ejected: true, shots: 0 };
   });
+  weapons.forEach(layoutHome);
 
   // ---------- Skin-Automat auf dem Platz ----------
   const slotMachine = SR.buildSlotMachine(scene, -2.75, 3.05, 0, 0.6, world.padTop);
-  slotMachine.parts.forEach((m) => shootables.push(m));
+  slotMachine.parts.forEach((m) => staticShoot.push(m));
 
   // ---------- Zustand ----------
   const state = {
@@ -178,8 +244,18 @@
     inSlot: false,
     lookSlot: false,
     slotHint: false,
+    dead: false,
+    deadT: 0,
+    hp: 100,
+    maxHp: 100,
+    lastHurt: -99,
+    hurtFlash: 0,
+    drawing: false,
+    draw: 0,
+    drawHold: 0,
+    arrowShown: true,
   };
-  const stats = { shots: 0, hits: 0, heads: 0, down: 0 };
+  const stats = { shots: 0, hits: 0, heads: 0, down: 0, kills: 0 };
   let round = { start: null, done: false, resetAt: 0 };
   let clock = 0;
   let best = null;
@@ -197,7 +273,7 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const smooth = (t) => t * t * (3 - 2 * t);
   const approach = (v, target, step) => (v < target ? Math.min(target, v + step) : Math.max(target, v - step));
-  const isActive = () => state.started && !state.paused && !state.inSlot;
+  const isActive = () => state.started && !state.paused && !state.inSlot && !state.dead;
 
   // ---------- Geld (Taler) und Skins ----------
   // Taler pro Treffer: Kopf 50, Körper zufällig 35–45 (kleiner Vogelschrot anteilig).
@@ -241,8 +317,9 @@
   }
   function applyWeaponSkin(w) {
     const sid = econ.equipped[w.def.id] || 'standard';
-    SR.applySkin(w.table.group, w.def.id, sid);
-    SR.applySkin(w.view.group, w.def.id, sid);
+    w.variant = SR.applySkin(w.table.group, w.def.id, sid, w.table);
+    SR.applySkin(w.view.group, w.def.id, sid, w.view);
+    layoutHome(w);
   }
   function equipSkin(wid, sid) {
     if (sid !== 'standard' && !owns(wid, sid)) return;
@@ -255,10 +332,10 @@
   weapons.forEach(applyWeaponSkin);
 
   // Wie stark ein Körpertreffer für das Umwerfen zählt (Schrot weniger, Phantom-X doppelt)
-  const hitValue = (def) => (def.pelletHit != null ? def.pelletHit : def.bodyHits || 1);
+  const hitValue = (def) => (def.pelletHit != null ? def.pelletHit : def.bodyHits || (def.type === 'bow' ? 2 : 1));
 
   function payFor(res, def) {
-    if (res.type === 'head') return PAY.head;
+    if (res.type === 'head') return def.headPay || PAY.head;
     const body = PAY.bodyMin + Math.floor(Math.random() * (PAY.bodyMax - PAY.bodyMin + 1));
     return body * Math.min(1, hitValue(def));
   }
@@ -311,7 +388,7 @@
     }
     const def = SR.WEAPON_DEFS[index];
     const m = def.build();
-    SR.applySkin(m.group, def.id, skinId);
+    SR.applySkin(m.group, def.id, skinId, m);
     iconScene.add(m.group);
     m.group.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(m.group);
@@ -414,7 +491,11 @@
     state.equipT = 0;
     state.ads = 0;
     state.bloom = 0;
+    state.drawing = false;
+    state.draw = 0;
     state.nextShot = clock + 0.35;
+    if (w.view.setDraw) w.view.setDraw(0);
+    if (w.view.setArrowVisible) w.view.setArrowVisible(true);
     updateWeaponCard();
     SR.sound.pickup();
   }
@@ -495,6 +576,172 @@
     if (!state.fallback) requestLock();
   }
 
+  // ---------- Spieler: Lebensleiste, Treffer von Gegnern ----------
+  const pb = { center: new V3(), a: new V3(), b: new V3(), r: 0.3, moving: false };
+  // Der Körper des Spielers als Strecke (Füße–Kopf) mit Radius, für Gegner-Schüsse und -Pfeile
+  function playerBody() {
+    const prone = state.stance > 0.5;
+    const y0 = world.padTop + 0.1;
+    const y1 = prone ? world.padTop + 0.55 : state.pos.y + 0.1;
+    pb.a.set(state.pos.x, y0 + (prone ? 0 : 0.15), state.pos.z);
+    pb.b.set(state.pos.x, y1, state.pos.z);
+    pb.center.set(state.pos.x, y0 + (y1 - y0) * (prone ? 0.5 : 0.62), state.pos.z);
+    pb.r = prone ? 0.32 : 0.27;
+    pb.moving = state.moving;
+    return pb;
+  }
+
+  function traceStatic(origin, dir, far) {
+    ray.set(origin, dir);
+    ray.near = 0;
+    ray.far = far;
+    return ray.intersectObjects(staticShoot, false)[0] || null;
+  }
+
+  // links/rechts-Richtung eines Geräuschs (−1 links … 1 rechts)
+  function soundPan(pos) {
+    camera.updateMatrixWorld();
+    tmpV.subVectors(pos, camera.position).normalize();
+    tmpRight.setFromMatrixColumn(camera.matrixWorld, 0);
+    return clamp(tmpV.dot(tmpRight) * 1.3, -1, 1);
+  }
+
+  const projectiles = SR.createProjectiles(scene, { trace: traceArrow, onHit: arrowHit });
+  const enemies = SR.createEnemies({
+    scene,
+    playerBody,
+    traceStatic,
+    hurtPlayer,
+    fx,
+    sound: SR.sound,
+    pan: soundPan,
+    projectiles,
+  });
+
+  function currentShootables() {
+    if (enemies.version !== shootVersion) {
+      shootVersion = enemies.version;
+      shootables = staticShoot.concat(enemies.parts);
+    }
+    return shootables;
+  }
+
+  function hurtPlayer(dmg, from) {
+    if (state.dead || dmg <= 0) return;
+    state.hp = Math.max(0, state.hp - dmg);
+    state.lastHurt = clock;
+    state.hurtFlash = Math.min(1, state.hurtFlash + 0.3 + dmg / 70);
+    state.recoilPitch += (Math.random() - 0.2) * Math.min(0.05, dmg * 0.003);
+    state.recoilYaw += (Math.random() - 0.5) * Math.min(0.07, dmg * 0.004);
+    SR.sound.hurt();
+    if (from) {
+      // Richtungsanzeige: Winkel des Angreifers relativ zur Blickrichtung
+      const toYaw = Math.atan2(-(from.x - state.pos.x), -(from.z - state.pos.z));
+      let rel = toYaw - state.yaw;
+      while (rel > Math.PI) rel -= Math.PI * 2;
+      while (rel < -Math.PI) rel += Math.PI * 2;
+      ui.hitDir.style.setProperty('--a', (-rel * 180) / Math.PI + 'deg');
+      restartAnim(ui.hitDir, 'show');
+    }
+    if (state.hp <= 0) playerDown();
+  }
+
+  function playerDown() {
+    state.dead = true;
+    state.deadT = 0;
+    state.trigger = false;
+    state.aiming = false;
+    state.drawing = false;
+    state.draw = 0;
+    state.keys = {};
+    SR.sound.down();
+    ui.death.hidden = false;
+    ui.deathSub.textContent = 'Du stehst gleich wieder am Schießstand auf.';
+  }
+
+  function respawnPlayer() {
+    state.dead = false;
+    state.hp = state.maxHp;
+    state.hurtFlash = 0;
+    state.lastHurt = clock;
+    state.pos.set(0, world.padTop + EYE, 0.25);
+    state.yaw = 0;
+    state.pitch = -0.32;
+    state.recoilPitch = state.recoilYaw = 0;
+    state.prone = false;
+    state.stance = 0;
+    state.ads = 0;
+    enemies.reset(clock);
+    projectiles.clear('enemy');
+    ui.death.hidden = true;
+    toast('Du bist wieder auf den Beinen. Die Gegner sind zurückgesetzt.', 4);
+  }
+
+  // ---------- Pfeile und Bolzen ----------
+  // Spieler-Pfeile treffen alles Treffbare; Gegner-Pfeile treffen den Spieler oder die Welt.
+  function traceArrow(a, p0, dir, len) {
+    if (a.owner === 'enemy') {
+      const P = playerBody();
+      const rc = enemies.rayVsSegment(p0, dir, P.a, P.b);
+      const st = traceStatic(p0, dir, len);
+      if (rc.dist <= P.r && rc.t <= len && (!st || rc.t < st.distance)) {
+        return { point: p0.clone().addScaledVector(dir, rc.t), player: true, attach: false };
+      }
+      return st;
+    }
+    ray.set(p0, dir);
+    ray.near = 0;
+    ray.far = len;
+    return ray.intersectObjects(currentShootables(), false)[0] || null;
+  }
+
+  function arrowHit(a, hit) {
+    if (a.owner === 'enemy') {
+      if (hit.player) {
+        hurtPlayer(a.dmg, a.data && a.data.enemy ? a.data.enemy.pos : null);
+        SR.sound.arrowHit(0);
+        a.stuckT = 99; // Pfeil verschwindet
+      } else {
+        fx.impact(hit.point, hit.face ? hit.face.normal : new V3(0, 1, 0), (hit.object && hit.object.userData.surface) || 'grass', 0.8, true);
+      }
+      return;
+    }
+    const shot = { pellets: 1, byTarget: new Map(), byEnemy: new Map(), ping: false, def: a.data.weapon.def };
+    handleHit(hit, a.data.weapon, shot);
+    reportShot(shot);
+    SR.sound.arrowHit(camera.position.distanceTo(hit.point));
+  }
+
+  function releaseArrow(w, power) {
+    const d = w.def;
+    camera.updateMatrixWorld();
+    camera.getWorldDirection(aimDir);
+    tmpRight.setFromMatrixColumn(camera.matrixWorld, 0);
+    tmpUp.setFromMatrixColumn(camera.matrixWorld, 1);
+    const e = smooth(state.ads);
+    const spread = (lerp(d.hipSpread, d.adsSpread, e) + (state.moving ? 0.01 : 0)) * proneSteady() * (1.25 - power * 0.6);
+    jitter(aimDir, spread);
+    const speed = (d.arrowSpeed || 90) * (0.4 + 0.6 * power);
+    const pos = camera.position.clone().addScaledVector(aimDir, 0.5).addScaledVector(tmpRight, 0.05 * (1 - e)).addScaledVector(tmpUp, -0.06 * (1 - e));
+    projectiles.fire({
+      pos,
+      vel: aimDir.clone().multiplyScalar(speed),
+      owner: 'player',
+      dmg: d.dmg,
+      scale: w.variant === 'crossbow' ? 0.8 : 1,
+      data: { weapon: w, power },
+    });
+    stats.shots++;
+    if (round.start == null) round.start = clock;
+    state.lastShot = clock;
+    state.nextShot = clock + 0.45;
+    w.kick = 1;
+    w.shots++;
+    state.recoilPitch += 0.006;
+    SR.sound.bowShot();
+    enemies.noise(state.pos, 28);
+  }
+
   // ---------- Schießen ----------
   function fire(w) {
     const d = w.def;
@@ -513,14 +760,14 @@
 
     // Eine Kugel – oder bei Schrotflinten eine ganze Garbe Schrotkugeln
     const pellets = d.pellets || 1;
-    const shot = { pellets, byTarget: new Map(), ping: false };
+    const shot = { pellets, byTarget: new Map(), byEnemy: new Map(), ping: false, def: d };
     ray.near = 0.1;
     ray.far = 1200;
     for (let i = 0; i < pellets; i++) {
       tmpDir.copy(aimDir);
       if (pellets > 1) jitter(tmpDir, d.pelletSpread);
       ray.set(camera.position, tmpDir);
-      const hit = ray.intersectObjects(shootables, false)[0];
+      const hit = ray.intersectObjects(currentShootables(), false)[0];
       if (hit) handleHit(hit, w, shot);
       if (d.laser) {
         // Energiestrahl von der Mündung (ungefähr) bis zum Einschlag
@@ -548,11 +795,12 @@
 
     if (d.laser) SR.sound.laser();
     else SR.sound.shot(d.sound);
-    if (w.view.bolt || w.view.pump) {
+    enemies.noise(state.pos, d.laser ? 55 : 85);
+    if (w.view.bolt || w.view.pump || w.view.cycle) {
       w.boltT = 0;
       w.ejected = false;
-      if (w.view.bolt) SR.sound.bolt();
-      else SR.sound.pump();
+      if (w.view.pump) SR.sound.pump();
+      else SR.sound.bolt();
     } else if (d.id === 'revolver') {
       SR.sound.cylinder();
     }
@@ -582,6 +830,21 @@
     const n = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : new V3(0, 1, 0);
     const scale = 0.7 + h.distance / 22;
     const lite = shot.pellets > 1;
+    if (ud.enemy) {
+      const e = ud.enemy;
+      let entry = shot.byEnemy.get(e);
+      if (!entry) {
+        entry = { e, dmg: 0, head: false, pellets: 0, dist: camera.position.distanceTo(h.point) };
+        shot.byEnemy.set(e, entry);
+      }
+      const dd = w.def;
+      const fall = dd.pellets ? clamp(1.15 - entry.dist / 60, 0.35, 1) : 1; // Schrot verliert mit der Entfernung Wucht
+      entry.dmg += (dd.dmg || 20) * (ud.part === 'head' ? 2.5 : ud.part === 'limb' ? 0.65 : 1) * fall;
+      entry.head = entry.head || ud.part === 'head';
+      entry.pellets++;
+      fx.impact(h.point, n, 'cloth', scale, true);
+      return;
+    }
     if (ud.target && (ud.part === 'body' || ud.part === 'head')) {
       const t = ud.target;
       t.addHole(h, w.def.holeR);
@@ -605,7 +868,35 @@
   }
 
   // Nach dem Schuss: Geräusche, Zähler und Treffer-Anzeige (einmal pro Schuss, auch bei Schrot).
+  const KILL_BONUS = 100;
+  function reportEnemies(shot) {
+    shot.byEnemy.forEach((entry) => {
+      const res = enemies.damage(entry.e, entry.dmg, entry.head, clock);
+      if (!res) return;
+      const def = shot.def;
+      stats.hits++;
+      let pay = entry.head ? def.headPay || PAY.head : PAY.bodyMin + Math.floor(Math.random() * (PAY.bodyMax - PAY.bodyMin + 1));
+      let text = (entry.head ? 'Kopfschuss' : 'Treffer') + (entry.pellets > 1 ? ' · ' + entry.pellets + ' Kugeln' : '');
+      let kind = entry.head ? 'head' : 'body';
+      if (entry.head) stats.heads++;
+      if (res.killed) {
+        pay += KILL_BONUS;
+        stats.kills++;
+        text = 'Gegner besiegt! ' + (entry.head ? '(Kopfschuss)' : '');
+        kind = 'down';
+        SR.sound.win();
+      }
+      if (entry.head) SR.sound.hitHead(entry.dist);
+      else SR.sound.hitBody(entry.dist);
+      earn(pay);
+      econ.damage += pay;
+      popEarn(pay);
+      showHit(text + ' · +' + pay + ' Taler', kind);
+    });
+  }
+
   function reportShot(shot) {
+    reportEnemies(shot);
     let best = null;
     let dmg = 0;
     shot.byTarget.forEach((entry) => {
@@ -706,6 +997,55 @@
     ui.wBar.style.width = Math.round((w.def.rpm / maxRpm) * 100) + '%';
     ui.wAmmo.textContent = '∞';
     ui.weapon.classList.remove('empty');
+  }
+
+  // Lebensleiste, Treffer-Anzeige, Spannbalken des Bogens und Lebensbalken über den Gegnern
+  const barEls = new Map();
+  function updateVitals() {
+    const frac = state.hp / state.maxHp;
+    setText(ui.hpNum, 'hp', String(Math.ceil(state.hp)));
+    const pct = Math.round(frac * 100);
+    if (hudCache.hpw !== pct) {
+      hudCache.hpw = pct;
+      ui.hpBar.style.width = pct + '%';
+      ui.hpBar.dataset.level = pct < 30 ? 'low' : pct < 60 ? 'mid' : 'ok';
+      ui.vitals.classList.toggle('low', pct < 30);
+    }
+    const lowPulse = frac < 0.3 ? (0.18 + 0.1 * Math.sin(clock * 6)) * (1 - frac / 0.3) : 0;
+    ui.hurt.style.opacity = String(Math.min(0.85, state.hurtFlash * 0.8 + lowPulse));
+    setText(ui.kills, 'kills', String(stats.kills));
+    ui.drawBar.hidden = !state.drawing;
+    if (state.drawing) ui.drawFill.style.width = Math.round(state.draw * 100) + '%';
+
+    // Lebensbalken: über Gegnern, die gerade getroffen wurden oder im Fadenkreuz sind
+    camera.getWorldDirection(tmpDir);
+    enemies.list.forEach((en) => {
+      let el = barEls.get(en);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'ebar';
+        el.innerHTML = '<span></span><div><i></i></div>';
+        el.firstChild.textContent = en.def.short;
+        ui.enemyBars.appendChild(el);
+        barEls.set(en, el);
+      }
+      let show = false;
+      if (en.state !== 'dead' && isActive()) {
+        tmpV.set(en.pos.x, 2.12, en.pos.z).sub(camera.position);
+        const dist = tmpV.length();
+        tmpV.divideScalar(dist);
+        const cosA = tmpV.dot(tmpDir);
+        if (cosA > 0.2 && dist < 110) {
+          show = en.hurtT < 5 || (cosA > 0.9985 && dist < 90);
+          if (show) {
+            tmpV.set(en.pos.x, 2.12, en.pos.z).project(camera);
+            el.style.transform = 'translate(' + ((tmpV.x * 0.5 + 0.5) * window.innerWidth).toFixed(1) + 'px,' + ((-tmpV.y * 0.5 + 0.5) * window.innerHeight).toFixed(1) + 'px)';
+            el.lastChild.firstChild.style.width = Math.round((en.hp / en.maxHp) * 100) + '%';
+          }
+        }
+      }
+      if (el.hidden === show) el.hidden = !show;
+    });
   }
 
   function updateHud(e) {
@@ -946,6 +1286,15 @@
     const w = state.held;
     const d = w ? w.def : null;
 
+    // Lebensleiste: langsam nachwachsen, wenn man eine Weile nicht getroffen wurde; nach dem Fallen wieder aufstehen
+    if (state.dead) {
+      state.deadT += dt;
+      if (state.deadT > 4.2) respawnPlayer();
+    } else if (clock - state.lastHurt > 6 && state.hp < state.maxHp && state.started && !state.paused) {
+      state.hp = Math.min(state.maxHp, state.hp + 7 * dt);
+    }
+    state.hurtFlash = Math.max(0, state.hurtFlash - dt * 1.6);
+
     if (active) {
       const k = state.keys;
       const turn = 1.7 * dt * (camera.fov / BASE_FOV) * state.sens;
@@ -982,7 +1331,40 @@
     state.equipT = Math.min(1, state.equipT + dt / 0.35);
     let burst = 0;
     const stanceChanging = Math.abs(state.stance - (state.prone ? 1 : 0)) > 0.02;
-    while (w && active && state.trigger && !stanceChanging && state.equipT >= 1 && clock >= state.nextShot && burst < 3) {
+
+    // Bogen / Armbrust: Linksklick gedrückt halten = spannen, loslassen = schießen
+    if (w && d.type === 'bow') {
+      const v = w.view;
+      const canDraw = active && state.equipT >= 1 && !stanceChanging;
+      if (state.trigger && canDraw && !state.drawing && clock >= state.nextShot) {
+        state.drawing = true;
+        state.draw = 0;
+        state.drawHold = 0;
+        SR.sound.bowDraw();
+        if (v.setArrowVisible) v.setArrowVisible(true);
+      }
+      if (state.drawing) {
+        state.draw = Math.min(1, state.draw + dt / (d.drawTime || 0.8));
+        if (state.draw >= 1) state.drawHold += dt;
+        if (!state.trigger || !canDraw) {
+          state.drawing = false;
+          if (canDraw && state.draw >= 0.3) {
+            releaseArrow(w, state.draw);
+            state.draw = 0;
+            if (v.setArrowVisible) v.setArrowVisible(false); // Pfeil ist weg, bis neu aufgelegt wird
+          }
+        }
+      } else {
+        state.draw = Math.max(0, state.draw - dt * 5);
+        if (v.setArrowVisible && clock >= state.nextShot) v.setArrowVisible(true);
+      }
+      if (v.setDraw) v.setDraw(state.draw);
+    } else {
+      state.drawing = false;
+      state.draw = 0;
+    }
+
+    while (w && d.type !== 'bow' && active && state.trigger && !stanceChanging && state.equipT >= 1 && clock >= state.nextShot && burst < 3) {
       fire(w);
       state.nextShot = (clock - state.nextShot > d.interval ? clock : state.nextShot) + d.interval;
       burst++;
@@ -1002,6 +1384,12 @@
       swayP = Math.sin(clock * 1.3) * 0.0005 * amp;
       swayY = Math.sin(clock * 0.9) * 0.0007 * amp;
     }
+    if (state.drawing && state.draw >= 1) {
+      // Arm zittert, wenn man den Bogen lange gespannt hält
+      const tr = Math.min(1, state.drawHold / 2.5) * proneSteady();
+      swayP += Math.sin(clock * 9) * 0.0016 * tr;
+      swayY += Math.sin(clock * 7.3) * 0.002 * tr;
+    }
     // Hinlegen / Aufstehen (Strg)
     state.stance = approach(state.stance, state.prone ? 1 : 0, dt / PRONE_TIME);
     const st = smooth(state.stance);
@@ -1009,10 +1397,12 @@
     state.pos.y = world.padTop + lerp(EYE, EYE_PRONE, st);
     camera.position.copy(state.pos);
     camera.position.y -= midway * 0.06;
+    const fall = state.dead ? smooth(Math.min(1, state.deadT / 0.9)) : 0; // Spieler kippt um
+    camera.position.y -= fall * Math.max(0, state.pos.y - world.padTop - 0.22);
     camera.rotation.set(
       clamp(state.pitch + state.recoilPitch + swayP, -1.55, 1.55),
       state.yaw + state.recoilYaw + swayY,
-      midway * 0.07
+      midway * 0.07 + fall * 1.1
     );
     camera.updateMatrixWorld();
 
@@ -1048,7 +1438,16 @@
       g.rotation.set(w.kick * d.kickRot - (1 - eq) * 0.9 - midway * 0.5, state.swayX * 2 * swayK, 0);
 
       // KR86: Kammerstängel hoch, zurück, vor, runter
-      if (v.bolt || v.pump) w.boltT = Math.min(1, w.boltT + dt / (d.interval - 0.05));
+      if (v.bolt || v.pump || v.cycle) w.boltT = Math.min(1, w.boltT + dt / (d.interval - 0.05));
+      // Waffen mit eigener Durchlade-Animation (z. B. Unterhebelrepetierer)
+      if (v.cycle) {
+        v.cycle(w.boltT);
+        if (!w.ejected && w.boltT >= 0.4) {
+          w.ejected = true;
+          if (d.shell && v.eject) ejectShell(w);
+        }
+        if (w.boltT < 1) g.rotation.z = Math.sin(Math.PI * clamp((w.boltT - 0.1) / 0.7, 0, 1)) * 0.12 * (1 - e);
+      }
       // SG-21: Vorderschaft zurück und wieder vor, dabei fliegt die Hülse raus
       if (v.pump) {
         const p = w.boltT;
@@ -1106,6 +1505,10 @@
     muzzleLight.position.copy(camera.position).addScaledVector(tmpDir, 0.9);
 
     targets.forEach((t) => t.update(dt));
+    if (state.started && !state.paused && !state.inSlot && !state.dead) {
+      enemies.update(dt, clock);
+      projectiles.update(dt);
+    }
     fx.update(dt);
     world.update(clock);
     slotMachine.update(clock, dt);
@@ -1120,6 +1523,7 @@
       toast('Du hast ' + econ.money + ' Taler! Hinten links auf dem Platz steht der Skin-Automat.', 5);
     }
     updateHud(e);
+    updateVitals();
 
     if (toastTimer > 0) {
       toastTimer -= dt;
@@ -1190,6 +1594,11 @@
     equipSkin,
     weaponIcon,
     unlockWeapon,
+    enemies,
+    projectiles,
+    hurtPlayer,
+    respawnPlayer,
+    layoutHome,
     start() {
       state.started = true;
       state.fallback = true;

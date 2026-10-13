@@ -9,20 +9,21 @@
   // Umgefallene Scheiben stehen nach dieser Zeit (Sekunden) von selbst wieder auf.
   SR.TARGET_RESPAWN = 5 * 60;
 
-  // [Richtung in Grad (0 = geradeaus, im Uhrzeigersinn), Entfernung in Metern]
+  // [Richtung in Grad (0 = geradeaus, im Uhrzeigersinn), Entfernung in Metern, Schienenlänge (± Meter), Tempo (m/s)]
+  // Mit Schiene fährt die Scheibe quer zur Blickrichtung hin und her.
   const LAYOUT = [
     [0, 12],
-    [-28, 22],
-    [24, 30],
+    [-28, 22, 5, 1.6],
+    [24, 30, 8, 2.2],
     [6, 55],
-    [62, 16],
+    [62, 16, 4, 1.2],
     [100, 35],
-    [140, 22],
+    [140, 22, 6, 2.8],
     [180, 48],
     [220, 14],
     [258, 28],
-    [298, 70],
-    [332, 40],
+    [298, 70, 10, 2.0],
+    [332, 40, 7, 1.5],
   ];
 
   const BODY = [
@@ -111,7 +112,7 @@
   }
 
   class Target {
-    constructor(scene, angleDeg, dist, index) {
+    constructor(scene, angleDeg, dist, index, rail, speed) {
       const S = getShared();
       this.index = index;
       this.dist = dist;
@@ -130,6 +131,30 @@
       root.position.set(Math.sin(a) * dist, 0, -Math.cos(a) * dist);
       scene.add(root);
       root.lookAt(0, 0, 0);
+
+      // Fahrschiene: quer zur Blickrichtung
+      this.base = root.position.clone();
+      this.rail = rail || 0;
+      this.speed = speed || 0;
+      this.moving = this.rail > 0;
+      if (this.moving) {
+        this.u = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+        this.off = (Math.random() * 2 - 1) * this.rail;
+        this.dirM = Math.random() < 0.5 ? -1 : 1;
+        const railMesh = new THREE.Mesh(new THREE.BoxGeometry(this.rail * 2 + 1.2, 0.03, 0.46), S.steel);
+        railMesh.position.set(this.base.x, 0.015, this.base.z);
+        railMesh.rotation.y = -Math.atan2(this.u.z, this.u.x);
+        railMesh.receiveShadow = true;
+        scene.add(railMesh);
+        for (let k = -1; k <= 1; k += 2) {
+          const stop = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 0.5), S.wood);
+          stop.position.set(this.base.x + this.u.x * k * (this.rail + 0.7), 0.15, this.base.z + this.u.z * k * (this.rail + 0.7));
+          stop.rotation.y = railMesh.rotation.y;
+          stop.castShadow = true;
+          scene.add(stop);
+        }
+        root.position.copy(this.base).addScaledVector(this.u, this.off);
+      }
 
       const base = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.05, 0.36), S.steel);
       base.position.set(0, 0.025, -0.02);
@@ -274,12 +299,25 @@
           this.landed = false;
         }
       }
+      if (this.moving && this.state === 'up') {
+        this.off += this.dirM * this.speed * dt;
+        if (this.off > this.rail) {
+          this.off = this.rail;
+          this.dirM = -1;
+        } else if (this.off < -this.rail) {
+          this.off = -this.rail;
+          this.dirM = 1;
+        }
+        this.root.position.copy(this.base).addScaledVector(this.u, this.off);
+        this.dist = Math.hypot(this.root.position.x, this.root.position.z);
+        this.root.updateMatrixWorld(true);
+      }
       this.kick *= Math.exp(-dt * 9);
       this.pivot.rotation.x = -(this.angle + this.kick);
     }
   }
 
   SR.createTargets = function (scene) {
-    return LAYOUT.map((l, i) => new Target(scene, l[0], l[1], i));
+    return LAYOUT.map((l, i) => new Target(scene, l[0], l[1], i, l[2], l[3]));
   };
 })();

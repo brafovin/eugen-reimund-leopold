@@ -771,6 +771,7 @@
     },
     {
       id: 'phantom',
+      headPay: 100, // Kopfschuss mit der Geheimwaffe bringt 100 Taler
       name: 'Phantom-X',
       short: 'Phantom',
       kind: 'Geheimwaffe · Energiegewehr',

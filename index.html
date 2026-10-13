@@ -21,7 +21,11 @@
       </div>
     </div>
     <div id="crosshair"><span class="t"></span><span class="b"></span><span class="l"></span><span class="r"></span><i></i></div>
+    <div id="hurt"></div>
+    <div id="hitDir"><i></i></div>
+    <div id="enemyBars"></div>
     <div id="pattern" hidden></div>
+    <div id="drawBar" hidden><i id="drawFill"></i></div>
     <div id="hitmarker"><span></span><span></span><span></span><span></span></div>
     <div id="hitText"></div>
 
@@ -34,6 +38,7 @@
         <div><dt>Kopftreffer</dt><dd id="statHeads">0</dd></div>
         <div><dt>Zeit</dt><dd id="statTime">–</dd></div>
         <div><dt>Bestzeit</dt><dd id="statBest">–</dd></div>
+        <div class="wide"><dt>Gegner besiegt</dt><dd id="statKills">0</dd></div>
         <div class="wide"><dt>Haltung</dt><dd id="statStance">stehend</dd></div>
         <div class="wide" id="respawnRow" hidden><dt>Nächste steht auf in</dt><dd id="statRespawn">5:00</dd></div>
       </dl>
@@ -43,6 +48,11 @@
       <div class="bal"><i class="coin" aria-hidden="true">T</i><b id="money">0</b><small>Taler</small></div>
       <div class="dmg">Schaden gesamt <span id="damageTotal">0</span></div>
       <div id="earn" aria-hidden="true"></div>
+    </section>
+
+    <section id="vitals" class="panel" aria-label="Leben">
+      <div class="vlabel"><span>Leben</span><b id="hpNum">100</b></div>
+      <div class="hpTrack"><div id="hpBar" data-level="ok"></div></div>
     </section>
 
     <section id="weaponCard" class="panel empty" aria-label="Waffe in der Hand">
@@ -73,6 +83,10 @@
       <em>Neue Runde startet gleich – oder drück <kbd>R</kbd></em>
     </div>
     <div id="toast" hidden></div>
+    <div id="death" hidden>
+      <strong>Du wurdest getroffen</strong>
+      <span id="deathSub"></span>
+    </div>
   </div>
 
   <div id="slot" hidden role="dialog" aria-modal="true" aria-labelledby="slotTitle">
@@ -121,7 +135,7 @@
       <header class="intro">
         <p class="eyebrow">Stand 1 · Freigelände</p>
         <h1>Freiluft-<br>Schießstand</h1>
-        <p class="lede">Sechs Waffen liegen auf dem Tisch, zwölf Mannscheiben stehen rundherum im Gelände, zwischen 12 und 70 Metern entfernt. Ein Kopftreffer wirft eine Scheibe sofort um. Am Körper braucht es sechs Treffer. Nach fünf Minuten steht jede Scheibe von selbst wieder auf. Jeder Treffer bringt Taler, die du am Skin-Automaten hinten auf dem Platz gegen Waffen-Skins eintauschen kannst. Mit viel Glück gewinnst du dort auch eine Geheimwaffe.</p>
+        <p class="lede">Auf dem Tisch liegen Waffen, an der Waffenwand rechts hängen noch mehr. Zwölf Mannscheiben stehen im Gelände, einige fahren auf Schienen hin und her. Auf den Feldwegen laufen Gegner mit Waffen und schießen auf dich, behalte deine Lebensleiste im Auge. Ein Kopftreffer wirft eine Scheibe sofort um, am Körper braucht es sechs Treffer. Jeder Treffer bringt Taler für den Skin-Automaten.</p>
         <button id="startBtn" type="button"><span id="startLabel">Spiel starten</span></button>
         <p class="mobile-note">Dieses Spiel braucht Maus und Tastatur.</p>
         <label class="sens" for="sens">
@@ -149,7 +163,7 @@
           <h2 id="hWeapons">Kadenz der Waffen</h2>
           <ul class="arsenal" id="arsenal"></ul>
           <p class="note">Alle Waffen haben unendlich Munition. Du kannst immer nur eine Waffe in der Hand halten.</p>
-          <p class="note">Taler pro Treffer: Kopf 50, Körper 35 bis 45.</p>
+          <p class="note">Taler pro Treffer: Kopf 50 (Phantom-X: 100), Körper 35 bis 45. Einen Gegner zu besiegen bringt 100 Taler extra.</p>
         </section>
       </div>
     </div>
@@ -167,6 +181,7 @@
   <script src="js/targets.js"></script>
   <script src="js/effects.js"></script>
   <script src="js/humans.js"></script>
+  <script src="js/projectiles.js"></script>
   <script src="js/enemies.js"></script>
   <script src="js/wall.js"></script>
   <script src="js/slot.js"></script>

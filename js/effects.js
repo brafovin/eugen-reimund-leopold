@@ -10,6 +10,7 @@
     wood: { color: 0x8a6238, dust: 0xc6a77c, count: 6, speed: 2.0 },
     target: { color: 0xd8bd88, dust: 0xe6d3a8, count: 6, speed: 1.6 },
     steel: { color: 0xffc46b, dust: 0xbab6ad, count: 9, speed: 4.5 },
+    cloth: { color: 0x8d8774, dust: 0xb9b2a0, count: 5, speed: 1.4 },
   };
   SR.SURFACE = SURFACE;
 
@@ -95,7 +96,7 @@
     // --- Energiestrahlen (Phantom-X) ---
     const beamGeo = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true).rotateX(Math.PI / 2);
     const beams = [];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 24; i++) {
       const m = new THREE.Mesh(
         beamGeo,
         new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false })
@@ -106,7 +107,8 @@
       beams.push({ mesh: m, life: 0, max: 1, len: 1 });
     }
     let nextBeam = 0;
-    function beam(from, to, color) {
+    // width: Grundbreite, life: Sekunden sichtbar (Strahlen wachsen beim Verblassen leicht)
+    function beam(from, to, color, width, life) {
       const b = beams[nextBeam];
       nextBeam = (nextBeam + 1) % beams.length;
       b.len = from.distanceTo(to);
@@ -114,7 +116,12 @@
       b.mesh.lookAt(to);
       b.mesh.material.color.set(color);
       b.mesh.visible = true;
-      b.max = b.life = 0.14;
+      b.width = width || 0.006;
+      b.max = b.life = life || 0.14;
+    }
+    // Leuchtspur der Gegner-Schüsse: dünn und kurz
+    function tracer(from, to, color) {
+      beam(from, to, color || 0xffd27a, 0.007, 0.07);
     }
 
     // pos/dir im Kamera-Raum (vmScene)
@@ -186,7 +193,7 @@
           return;
         }
         const k = b.life / b.max;
-        const w = 0.006 + (1 - k) * 0.012;
+        const w = b.width + (1 - k) * b.width * 2;
         b.mesh.scale.set(w, w, b.len);
         b.mesh.material.opacity = k;
       });
@@ -206,6 +213,6 @@
       });
     }
 
-    return { impact, ejectShell, beam, update };
+    return { impact, ejectShell, beam, tracer, update };
   };
 })();

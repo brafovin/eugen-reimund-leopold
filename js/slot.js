@@ -199,7 +199,7 @@
     const MONEY = { kind: 'money' };
     const NONE = { kind: 'none' };
     const SECRET = { kind: 'secret' };
-    const SYMBOLS = DEFS.map((d, i) => (d.secret ? null : { kind: 'weapon', index: i }))
+    const SYMBOLS = DEFS.map((d, i) => (d.secret || !SR.skinList(d.id).length ? null : { kind: 'weapon', index: i }))
       .filter(Boolean)
       .concat([MONEY, NONE, SECRET]);
     const randSym = () => SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
@@ -417,6 +417,7 @@
     function renderGrid() {
       let owned = 0;
       const rows = DEFS.map((d, i) => {
+        if (!d.secret && !SR.skinList(d.id).length) return ''; // Waffen ohne Skins stehen nicht in der Sammlung
         const eq = api.equipped(d.id);
         const hasWeapon = !d.secret || api.ownsWeapon(d.id);
         const tiles = [{ id: 'standard', name: 'Standard', rarity: -1 }].concat(SR.skinList(d.id)).map((s) => {

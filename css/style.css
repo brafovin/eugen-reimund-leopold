@@ -630,7 +630,7 @@ h1 {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 .controls li {
   display: grid;
@@ -645,24 +645,24 @@ h1 {
 .arsenal li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2px 10px;
-  padding-bottom: 8px;
+  gap: 1px 10px;
+  padding-bottom: 5px;
   border-bottom: 1px dashed var(--line);
 }
 .arsenal .n {
-  font: 400 19px/1.1 var(--display);
+  font: 400 16px/1.1 var(--display);
   letter-spacing: 0.03em;
 }
 .arsenal .k {
   grid-column: 1;
-  font-size: 14px;
+  font-size: 12.5px;
   color: var(--muted);
 }
 .arsenal .v {
   grid-column: 2;
   grid-row: 1 / span 2;
   align-self: center;
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--amber);
@@ -1185,6 +1185,165 @@ h1 {
 }
 @keyframes winPulse {
   50% { box-shadow: inset 0 0 0 5px var(--win), 0 0 22px 2px var(--win); }
+}
+
+/* ---------- Lebensleiste und Gegner ---------- */
+#vitals {
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: min(300px, calc(100% - 32px));
+  padding: 8px 12px 10px;
+}
+.vlabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.vlabel b {
+  font-size: 22px;
+  letter-spacing: 0;
+  color: var(--khaki);
+  font-variant-numeric: tabular-nums;
+}
+.hpTrack {
+  position: relative;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 3px;
+  background: rgba(235, 227, 200, 0.14);
+  overflow: hidden;
+}
+.hpTrack::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(0, 0, 0, 0.5) calc(10% - 1px) 10%);
+}
+#hpBar {
+  height: 100%;
+  width: 100%;
+  background: #5fbf6a;
+  transition: width 0.25s ease, background 0.25s ease;
+}
+#hpBar[data-level='mid'] { background: #e6ae45; }
+#hpBar[data-level='low'] { background: #e0493a; }
+#vitals.low {
+  border-color: rgba(224, 73, 58, 0.8);
+  animation: lowPulse 1s ease-in-out infinite;
+}
+#hurt {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(160, 0, 0, 0) 42%, rgba(176, 12, 12, 0.6) 100%);
+}
+#hitDir {
+  --a: 0deg;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  transform: rotate(var(--a));
+}
+#hitDir i {
+  position: absolute;
+  left: -20px;
+  top: -190px;
+  width: 40px;
+  height: 70px;
+  background: linear-gradient(to bottom, rgba(236, 62, 46, 0.95), rgba(236, 62, 46, 0));
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+#hitDir.show { animation: hitDirFade 1.1s ease-out; }
+#drawBar {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 48px);
+  width: 90px;
+  height: 5px;
+  margin-left: -45px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+#drawFill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--amber);
+}
+#enemyBars {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.ebar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 64px;
+  margin: -16px 0 0 -32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.ebar span {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--khaki);
+  text-shadow: 0 1px 2px #000;
+}
+.ebar div {
+  width: 100%;
+  height: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.65);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+.ebar i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #e0493a;
+}
+#death {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  background: rgba(52, 0, 0, 0.58);
+  text-align: center;
+}
+#death strong {
+  font: 400 clamp(32px, 6vw, 58px) / 1.05 var(--display);
+  letter-spacing: 0.03em;
+  color: #ff6a55;
+}
+#death span {
+  font-size: 20px;
+  color: var(--khaki);
+}
+@keyframes hitDirFade {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes lowPulse {
+  50% { box-shadow: 0 0 18px 2px rgba(224, 73, 58, 0.55); }
 }
 
 @keyframes hitmark {

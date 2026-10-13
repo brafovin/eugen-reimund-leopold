@@ -72,7 +72,7 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + atk + o.decay);
       src.connect(f);
       f.connect(g);
-      g.connect(this.master);
+      g.connect(this.dest || this.master);
       if (o.echo) {
         const e = ctx.createGain();
         e.gain.value = o.echo;
@@ -93,17 +93,88 @@
       g.gain.exponentialRampToValueAtTime(o.gain, t + (o.attack || 0.002));
       g.gain.exponentialRampToValueAtTime(0.0001, t + (o.attack || 0.002) + o.decay);
       osc.connect(g);
-      g.connect(this.master);
+      g.connect(this.dest || this.master);
       osc.start(t);
       osc.stop(t + o.decay + 0.05);
     }
 
     shot(s) {
       if (!this.ready) return;
-      const t = this.ctx.currentTime + 0.005;
+      const t = this.ctx.currentTime + 0.005 + (this.delay || 0);
       this.noise(t, { type: 'highpass', freq: s.crack, q: 0.4, decay: 0.045, gain: s.gain * 0.9 });
       this.noise(t, { type: 'lowpass', freq: s.body, freqEnd: s.body * 0.25, q: 0.9, decay: s.decay, gain: s.gain, echo: s.echo });
       this.tone(t, { freq: s.thump, freqEnd: 32, decay: 0.2, gain: s.gain * 0.85 });
+    }
+
+    // Ein Geräusch aus der Welt: Lautstärke nach Entfernung, Richtung links/rechts (pan -1..1), verzögert durch den Schall
+    positional(dist, pan, fn) {
+      if (!this.ready) return;
+      const ctx = this.ctx;
+      const gain = ctx.createGain();
+      gain.gain.value = Math.max(0.05, Math.min(1, 14 / (dist + 8)));
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = Math.max(900, 9000 - dist * 55);
+      const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      gain.connect(lp);
+      if (pn) {
+        pn.pan.value = Math.max(-1, Math.min(1, pan));
+        lp.connect(pn);
+        pn.connect(this.master);
+      } else lp.connect(this.master);
+      const saved = this.dest;
+      this.dest = gain;
+      this.delay = Math.min(0.7, dist / 340);
+      try {
+        fn();
+      } finally {
+        this.dest = saved;
+        this.delay = 0;
+      }
+    }
+
+    enemyShot(s, dist, pan) {
+      this.positional(dist, pan, () => this.shot(s));
+    }
+
+    // Bogen: Sehne schnellt, Pfeil zischt
+    bowShot(dist, pan) {
+      const f = () => {
+        const t = this.ctx.currentTime + 0.003 + (this.delay || 0);
+        this.tone(t, { type: 'triangle', freq: 190, freqEnd: 95, decay: 0.16, gain: 0.3 });
+        this.noise(t, { type: 'bandpass', freq: 1900, freqEnd: 700, q: 1.4, decay: 0.2, gain: 0.16 });
+      };
+      if (dist == null) f();
+      else this.positional(dist, pan, f);
+    }
+
+    bowDraw() {
+      if (!this.ready) return;
+      const t = this.ctx.currentTime;
+      this.noise(t, { type: 'bandpass', freq: 380, freqEnd: 620, q: 3, decay: 0.6, gain: 0.05, attack: 0.15 });
+    }
+
+    arrowHit(dist) {
+      if (!this.ready) return;
+      const t = this.ctx.currentTime + (dist || 0) / 340;
+      this.noise(t, { type: 'lowpass', freq: 600, q: 1, decay: 0.07, gain: 0.45 });
+      this.tone(t, { type: 'triangle', freq: 150, freqEnd: 90, decay: 0.1, gain: 0.2 });
+    }
+
+    // Spieler getroffen: dumpfer Schlag
+    hurt() {
+      if (!this.ready) return;
+      const t = this.ctx.currentTime;
+      this.tone(t, { type: 'sine', freq: 130, freqEnd: 50, decay: 0.28, gain: 0.5 });
+      this.noise(t, { type: 'lowpass', freq: 700, q: 1, decay: 0.15, gain: 0.35 });
+    }
+
+    // Spieler ist gefallen
+    down() {
+      if (!this.ready) return;
+      const t = this.ctx.currentTime;
+      this.tone(t, { type: 'sawtooth', freq: 220, freqEnd: 40, decay: 0.9, gain: 0.18 });
+      this.noise(t, { type: 'lowpass', freq: 300, freqEnd: 90, q: 1, decay: 0.8, gain: 0.4 });
     }
 
     // Energiegewehr: hoher Pfeifton, der schnell abfällt
